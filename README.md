@@ -1,7 +1,7 @@
 # Thesis Tools
 
 A small set of CLI scripts for thesis writing. Each script does one thing.
-You decide when to run which. There is no orchestration — that is on purpose.
+You decide when to run which. 
 
 ## What's here
 
