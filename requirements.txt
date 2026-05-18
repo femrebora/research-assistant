@@ -1,0 +1,6 @@
+litellm>=1.50.0
+pyzotero>=1.5.20
+paper-qa>=5.0.0
+python-dotenv>=1.0.0
+click>=8.1.0
+rich>=13.7.0
