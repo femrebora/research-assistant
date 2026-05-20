@@ -16,6 +16,9 @@ st.set_page_config(
 def inject_background():
     """Inject animated particle background via custom HTML/JS."""
     components.html("""
+    <style>
+      body { margin:0; overflow:hidden; background:#0a0a0f; }
+    </style>
     <canvas id="bg-canvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
     <div style="position:fixed;inset:0;z-index:998;pointer-events:none;
       background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);"></div>
@@ -84,7 +87,7 @@ def inject_background():
       if(st.life<=0||st.x>c.width+50||st.y>c.height+50||st.x<-50)stars.splice(s,1);}
       requestAnimationFrame(anim);}anim();
     </script>
-    """, height=0)
+    """, height=600)
 
 
 inject_background()
@@ -95,7 +98,12 @@ st.markdown("""
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   * { font-family: 'IBM Plex Mono', monospace !important; }
   .stApp { background: transparent !important; }
+  .stApp > header { background: transparent !important; }
+  [data-testid="stAppViewContainer"] { background: transparent !important; }
+  [data-testid="stHeader"] { background: transparent !important; }
+  .main .block-container { background: transparent !important; padding-top:2rem !important; }
   section[data-testid="stSidebar"] { display: none; }
+  iframe { border:none !important; position:fixed !important; inset:0 !important; z-index:-1 !important; width:100vw !important; height:100vh !important; }
   .logo {
     text-align:center; font-size:1.4rem; font-weight:600; letter-spacing:0.15em;
     background: linear-gradient(135deg, #ff6b9d, #b083ff);
