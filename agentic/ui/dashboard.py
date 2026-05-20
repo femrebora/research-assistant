@@ -14,17 +14,21 @@ st.set_page_config(
 
 
 def inject_background():
-    """Inject animated particle background via custom HTML/JS."""
-    components.html("""
-    <style>
-      html, body { margin:0; padding:0; overflow:hidden; background:#0a0a0f; width:100vw; height:100vh; }
-    </style>
+    """Inject animated particle canvas directly into the page, script via helper iframe."""
+    # Canvas + scanlines injected directly into Streamlit's DOM
+    st.markdown("""
     <canvas id="bg-canvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
     <div style="position:fixed;inset:0;z-index:998;pointer-events:none;
       background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);"></div>
+    """, unsafe_allow_html=True)
+
+    # Script runs in a same-origin iframe, accesses parent.document to draw on the canvas
+    components.html("""
     <script>
-    const c=document.getElementById('bg-canvas'),x=c.getContext('2d');
-    c.width=window.innerWidth;c.height=window.innerHeight;
+    const d=parent.document,w=parent.window;
+    const c=d.getElementById('bg-canvas'),x=c.getContext('2d');
+    c.width=w.innerWidth;c.height=w.innerHeight;
+    w.addEventListener('resize',()=>{c.width=w.innerWidth;c.height=w.innerHeight;});
     let t=0,ps=[],orbs=[],stars=[];
     const COLS=['#ff6b9d','#00e5ff','#a0ff48','#b083ff','#ffb347','#ff9a76','#7bffd7'];
     class Orb{constructor(){this.x=Math.random()*c.width;this.y=Math.random()*c.height;
@@ -87,7 +91,7 @@ def inject_background():
       if(st.life<=0||st.x>c.width+50||st.y>c.height+50||st.x<-50)stars.splice(s,1);}
       requestAnimationFrame(anim);}anim();
     </script>
-    """, height=200)
+    """, height=0)
 
 
 inject_background()
@@ -103,19 +107,7 @@ st.markdown("""
   [data-testid="stHeader"] { background: transparent !important; }
   .main .block-container { background: transparent !important; padding-top:2rem !important; }
   section[data-testid="stSidebar"] { display: none; }
-
-  /* Force the background iframe to cover the full viewport */
-  div[data-testid="stIFrame"] {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 0 !important;
-    pointer-events: none !important;
-  }
-  div[data-testid="stIFrame"] iframe {
-    width: 100vw !important;
-    height: 100vh !important;
-    border: none !important;
-  }
+  body { background: #0a0a0f !important; }
   .logo {
     text-align:center; font-size:1.4rem; font-weight:600; letter-spacing:0.15em;
     background: linear-gradient(135deg, #ff6b9d, #b083ff);
