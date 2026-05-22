@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from common import MODELS, _ask_via_cli, open_in_editor
+from research_assistant.common import MODELS, _ask_via_cli, open_in_editor
 
 
 class TestCliAliases:
@@ -44,7 +44,7 @@ class TestAskViaCli:
             stdout = "model output here"
             stderr = ""
 
-        with patch("common.subprocess.run", return_value=_FakeProc()) as run_mock:
+        with patch("research_assistant.common.subprocess.run", return_value=_FakeProc()) as run_mock:
             result = _ask_via_cli("THE PROMPT", "claude-cli", "claude -p")
 
         called_argv = run_mock.call_args.args[0]
@@ -64,7 +64,7 @@ class TestAskViaCli:
             stdout = "ok"
             stderr = ""
 
-        with patch("common.subprocess.run", return_value=_FakeProc()) as run_mock:
+        with patch("research_assistant.common.subprocess.run", return_value=_FakeProc()) as run_mock:
             _ask_via_cli("user q", "gemini-cli", "gemini -p", system="be terse")
 
         final_prompt = run_mock.call_args.args[0][-1]
@@ -79,9 +79,11 @@ class TestAskViaCli:
             stdout = ""
             stderr = "auth error: missing token"
 
-        with patch("common.subprocess.run", return_value=_FakeProc()):
-            with pytest.raises(RuntimeError, match="exit 2"):
-                _ask_via_cli("hi", "codex-cli", "codex exec")
+        with (
+            patch("research_assistant.common.subprocess.run", return_value=_FakeProc()),
+            pytest.raises(RuntimeError, match="exit 2"),
+        ):
+            _ask_via_cli("hi", "codex-cli", "codex exec")
 
 
 class TestOpenInEditor:
@@ -93,7 +95,7 @@ class TestOpenInEditor:
                 f.write("\nEDITED")
             return 0
 
-        monkeypatch.setattr("common.subprocess.call", fake_editor)
+        monkeypatch.setattr("research_assistant.common.subprocess.call", fake_editor)
         monkeypatch.setenv("EDITOR", "/usr/bin/true")
 
         result = open_in_editor("original text", suffix=".test")

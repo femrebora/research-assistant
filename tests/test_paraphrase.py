@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from paraphrase import StageResult, format_chain
+from research_assistant.writing.paraphrase import StageResult, format_chain
 
 
 def _stage(label: str, text: str, in_tokens=10, out_tokens=20, cost=0.001):

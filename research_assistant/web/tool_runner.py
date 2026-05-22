@@ -1,0 +1,586 @@
+"""Generic runner for the Click-based CLI modules.
+
+Each module (ask.py, audit.py, ideas.py, …) exposes a `main` Click command.
+We invoke them in-process via `click.testing.CliRunner`, which captures stdout
+and returns plain text. Tools that take a `*_FILE` positional argument accept
+either a path on disk OR pasted text via a textarea — pasted text is written
+to a temp file before invocation, then deleted.
+
+Adding a new tool? Add a `ToolSpec` to `TOOL_SPECS`. No other changes needed.
+"""
+from __future__ import annotations
+
+import contextlib
+import importlib
+import os
+import tempfile
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from click.testing import CliRunner
+
+from research_assistant.common import MODELS
+
+MODEL_ALIASES: list[str] = list(MODELS.keys())
+
+
+@dataclass(frozen=True)
+class Field:
+    """A single form field.
+
+    `kind`:
+      - "text"            single-line text input
+      - "textarea"        multi-line text
+      - "number"          numeric input (uses `step` and `min`/`max` if set)
+      - "select"          dropdown (uses `options` or `options_key="models"`)
+      - "multiselect"     checkbox group
+      - "checkbox"        single boolean flag
+      - "file_or_text"    textarea + optional disk path; positional file arg
+
+    `flag`:
+      - "--foo" for a Click option
+      - None for a positional argument (`@click.argument`)
+    """
+
+    name: str
+    label: str
+    kind: str
+    flag: str | None = None
+    default: Any = None
+    options: tuple[str, ...] = ()
+    options_key: str | None = None  # e.g. "models" -> MODEL_ALIASES
+    required: bool = False
+    help: str = ""
+    placeholder: str = ""
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    rows: int = 8
+
+    def resolved_options(self) -> list[str]:
+        if self.options_key == "models":
+            return MODEL_ALIASES
+        return list(self.options)
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """A single CLI tool exposed in the UI."""
+
+    name: str           # URL slug & module name
+    label: str          # human-readable
+    category: str       # "research" | "writing" | "audit" | "pipeline" | "meta"
+    description: str
+    fields: tuple[Field, ...]
+    long_running: bool = False  # show extra "this may take a while" warning
+
+
+# ── Tool specifications ─────────────────────────────────────────────────────
+
+
+TOOL_SPECS: tuple[ToolSpec, ...] = (
+    # ── Research ────────────────────────────────────────────────────────────
+    ToolSpec(
+        name="single_ask",
+        label="Single-model ask",
+        category="research",
+        description="Ask any configured model a single question. No document context. Useful for quick lookups, definitions, or second opinions.",
+        fields=(
+            Field("prompt", "Question", "textarea", required=True, rows=4,
+                  placeholder="Explain MitoScape's filtering approach."),
+            Field("model", "Model", "select", flag="--model", default="claude", options_key="models"),
+            Field("system", "System prompt (optional)", "textarea", flag="--system", rows=3,
+                  placeholder="You are a careful research assistant…"),
+            Field("temperature", "Temperature", "number", flag="--temperature", default=0.3,
+                  min=0.0, max=2.0, step=0.1),
+            Field("raw", "Raw text output", "checkbox", flag="--raw"),
+        ),
+    ),
+    ToolSpec(
+        name="zot",
+        label="Zotero search",
+        category="research",
+        description="Search your Zotero library by title/author/abstract/tag. Export as BibTeX or JSON.",
+        fields=(
+            Field("query", "Query", "text", required=True, placeholder="NUMT contamination"),
+            Field("limit", "Max results", "number", flag="--limit", default=15, min=1, max=200, step=1),
+            Field("collection", "Collection (optional)", "text", flag="--collection",
+                  placeholder="Chapter 1"),
+            Field("tag", "Tag (optional)", "text", flag="--tag"),
+            Field("bib", "Citekeys only", "checkbox", flag="--bib"),
+            Field("export_format", "Export format", "select", flag="--export",
+                  default="", options=("", "bibtex", "json")),
+        ),
+    ),
+    ToolSpec(
+        name="discover",
+        label="Discover new papers",
+        category="research",
+        description="Find papers via OpenAlex / Semantic Scholar / Elicit. Use this to expand your library beyond what's already in Zotero.",
+        fields=(
+            Field("query", "Query", "text", required=True,
+                  placeholder="NUMT filtering clinical mtDNA"),
+            Field("source", "Source", "select", flag="--source", default="openalex",
+                  options=("openalex", "semantic_scholar", "elicit")),
+            Field("limit", "Max results", "number", flag="--limit", default=15, min=1, max=100, step=1),
+            Field("year_from", "Year from (optional)", "number", flag="--year-from",
+                  min=1900, max=2100, step=1),
+            Field("sort", "Sort by", "select", flag="--sort", default="relevance",
+                  options=("relevance", "citations", "year")),
+            Field("export_format", "Export format", "select", flag="--export", default="",
+                  options=("", "bibtex", "json")),
+        ),
+        long_running=True,
+    ),
+    ToolSpec(
+        name="evidence",
+        label="Evidence (PaperQA2)",
+        category="research",
+        description="Cited answers via PaperQA2 over your local PDFs. Slower than RAG but produces tighter source-grounded prose.",
+        fields=(
+            Field("question", "Question", "textarea", required=True, rows=3,
+                  placeholder="What evidence exists for NUMT affecting variant calling?"),
+            Field("quality", "Quality preset", "select", flag="--quality", default="high_quality",
+                  options=("fast", "high_quality", "wikicrow")),
+            Field("model", "Model", "select", flag="--model", default="sonnet", options_key="models"),
+            Field("storage", "PDF directory (optional)", "text", flag="--storage",
+                  placeholder="/home/you/Zotero/storage"),
+            Field("save", "Save output as", "text", flag="--save",
+                  placeholder="evidence/ch1/numt.md"),
+        ),
+        long_running=True,
+    ),
+
+    # ── Writing pipeline ────────────────────────────────────────────────────
+    ToolSpec(
+        name="ideas",
+        label="Paragraph angles (ideas)",
+        category="writing",
+        description="Given a job statement and supporting evidence, brainstorm 3-5 distinct paragraph angles to choose from.",
+        fields=(
+            Field("evidence_file", "Evidence", "file_or_text", required=True, rows=10,
+                  placeholder="Paste evidence notes or supply a path under THESIS_ROOT."),
+            Field("job", "Job statement", "text", flag="--job", required=True,
+                  placeholder="Establish NUMT as clinically significant"),
+            Field("manuscript", "Existing manuscript path (optional)", "text", flag="--manuscript"),
+            Field("model", "Model", "select", flag="--model", default="claude", options_key="models"),
+            Field("temperature", "Temperature", "number", flag="--temperature",
+                  default=0.4, min=0.0, max=2.0, step=0.1),
+        ),
+    ),
+    ToolSpec(
+        name="outline",
+        label="Section outline",
+        category="writing",
+        description="Hierarchical outline with citation stubs. One stub per paragraph, depth-controlled, ready to draft against.",
+        fields=(
+            Field("evidence_file", "Evidence", "file_or_text", required=True, rows=10),
+            Field("job", "Job statement", "text", flag="--job", required=True),
+            Field("sections", "Top-level sections", "number", flag="--sections",
+                  default=3, min=1, max=10, step=1),
+            Field("depth", "Max nesting depth", "number", flag="--depth",
+                  default=2, min=1, max=4, step=1),
+            Field("model", "Model", "select", flag="--model", default="claude", options_key="models"),
+            Field("temperature", "Temperature", "number", flag="--temperature",
+                  default=0.3, min=0.0, max=2.0, step=0.1),
+            Field("save", "Save outline as", "text", flag="--save",
+                  placeholder="outlines/ch1.md"),
+            Field("raw", "Raw output", "checkbox", flag="--raw"),
+        ),
+    ),
+    ToolSpec(
+        name="critique",
+        label="Draft critique",
+        category="writing",
+        description="Single-model critique of a paragraph. Prose review or sentence-anchored (S1, S2, …) diff mode.",
+        fields=(
+            Field("draft_file", "Draft paragraph", "file_or_text", required=True, rows=10),
+            Field("job", "Job statement", "text", flag="--job", required=True),
+            Field("diff_mode", "Sentence-anchored (diff) mode", "checkbox", flag="--diff"),
+            Field("model", "Model", "select", flag="--model", default="claude", options_key="models"),
+            Field("temperature", "Temperature", "number", flag="--temperature",
+                  default=0.2, min=0.0, max=2.0, step=0.1),
+            Field("raw", "Raw output", "checkbox", flag="--raw"),
+        ),
+    ),
+    ToolSpec(
+        name="critic",
+        label="Writer + critic (2-model)",
+        category="writing",
+        description="One model drafts the paragraph from sources, another critiques it. Useful when you want a second perspective baked into one run.",
+        fields=(
+            Field("job", "Job statement", "text", required=True,
+                  placeholder="Define NUMT contamination clearly."),
+            Field("writer", "Writer model", "select", flag="--writer", default="claude",
+                  options_key="models"),
+            Field("critic", "Critic model", "select", flag="--critic", default="gemini",
+                  options_key="models"),
+            Field("sources", "Source file paths (one per line)", "textarea", flag="--sources",
+                  rows=4, placeholder="evidence/ch1/numt.md\nevidence/ch1/lcm.md"),
+            Field("writer_temp", "Writer temperature", "number", flag="--writer-temp",
+                  default=0.3, min=0.0, max=2.0, step=0.1),
+            Field("critic_temp", "Critic temperature", "number", flag="--critic-temp",
+                  default=0.2, min=0.0, max=2.0, step=0.1),
+            Field("save", "Save chain as", "text", flag="--save"),
+            Field("raw", "Raw output", "checkbox", flag="--raw"),
+        ),
+    ),
+    ToolSpec(
+        name="paraphrase",
+        label="Paraphrase pipeline",
+        category="writing",
+        description="Writer → paraphraser → checker. Three models cooperate to produce a paragraph with explicit meaning verification.",
+        fields=(
+            Field("brief_or_draft", "Brief or existing draft", "file_or_text",
+                  required=True, rows=10),
+            Field("writer", "Writer model (optional if Skip writer)", "select", flag="--writer",
+                  default="claude", options_key="models"),
+            Field("paraphraser", "Paraphraser model", "select", flag="--paraphraser",
+                  default="gemini", options_key="models"),
+            Field("checker", "Checker model", "select", flag="--checker",
+                  default="sonnet", options_key="models"),
+            Field("sources", "Source file paths (one per line)", "textarea", flag="--sources", rows=4),
+            Field("skip_writer", "Skip writer (input is already a draft)", "checkbox",
+                  flag="--skip-writer"),
+            Field("temperature", "Temperature", "number", flag="--temperature",
+                  default=0.3, min=0.0, max=2.0, step=0.1),
+            Field("save", "Save chain as", "text", flag="--save"),
+            Field("raw", "Raw output", "checkbox", flag="--raw"),
+        ),
+    ),
+    ToolSpec(
+        name="coherence",
+        label="Chapter coherence",
+        category="writing",
+        description="Whole-chapter analysis: transitions, redundancy, thesis support. Run on multi-paragraph drafts.",
+        fields=(
+            Field("draft_file", "Chapter draft", "file_or_text", required=True, rows=14),
+            Field("thesis", "Thesis sentence", "text", flag="--thesis", required=True,
+                  placeholder="NUMT filtering is mandatory for clinical mtDNA pipelines."),
+            Field("model", "Model", "select", flag="--model", default="claude", options_key="models"),
+            Field("temperature", "Temperature", "number", flag="--temperature",
+                  default=0.2, min=0.0, max=2.0, step=0.1),
+            Field("max_chars_per_paragraph", "Max chars/paragraph in prompt", "number",
+                  flag="--max-chars-per-paragraph", default=600, min=100, max=4000, step=50),
+            Field("raw", "Raw output", "checkbox", flag="--raw"),
+        ),
+    ),
+
+    # ── Audit & verify ──────────────────────────────────────────────────────
+    ToolSpec(
+        name="paraphrase_check",
+        label="Paraphrase similarity check",
+        category="audit",
+        description="Flag paragraphs in your draft that drifted too close to source wording. Catches accidental near-quotes.",
+        fields=(
+            Field("draft_file", "Chapter draft", "file_or_text", required=True, rows=14),
+            Field("threshold", "Similarity threshold", "number", flag="--threshold",
+                  default=0.85, min=0.5, max=1.0, step=0.01),
+            Field("top", "Top-N matches per paragraph", "number", flag="--top",
+                  default=2, min=1, max=10, step=1),
+            Field("min_chars", "Skip paragraphs shorter than", "number", flag="--min-chars",
+                  default=40, min=10, max=500, step=10),
+            Field("embedding_model", "Embedding model", "text", flag="--embedding-model"),
+            Field("as_json", "JSON output", "checkbox", flag="--json"),
+            Field("show_source", "Show matched source excerpts", "checkbox", flag="--show-source"),
+        ),
+    ),
+    ToolSpec(
+        name="audit",
+        label="Citation audit",
+        category="audit",
+        description="Per-source counts, over-cited papers, unused .bib entries, citation density.",
+        fields=(
+            Field("draft_file", "Chapter draft", "file_or_text", required=True, rows=14),
+            Field("bib", "Path to .bib file", "text", flag="--bib", default="bib/thesis.bib"),
+            Field("over_cite", "Flag sources cited more than", "number", flag="--over-cite",
+                  default=6, min=2, max=50, step=1),
+            Field("as_json", "JSON output", "checkbox", flag="--json"),
+        ),
+    ),
+    ToolSpec(
+        name="verify",
+        label="Citation verification",
+        category="audit",
+        description="Check every [@citekey] in your draft resolves to an entry in the .bib. Catches typos and hallucinated keys.",
+        fields=(
+            Field("draft_file", "Draft", "file_or_text", required=True, rows=14),
+            Field("bib", "Path to .bib file", "text", flag="--bib", default="bib/thesis.bib"),
+        ),
+    ),
+    ToolSpec(
+        name="claim_verify",
+        label="Semantic claim audit",
+        category="audit",
+        description="For each sentence/claim in your draft, retrieve from your RAG index and judge SUPPORTED / PARTIAL / UNSUPPORTED / CONTRADICTED.",
+        fields=(
+            Field("draft_file", "Draft", "file_or_text", required=True, rows=14),
+            Field("model", "Adjudicator model", "select", flag="--model", default="sonnet",
+                  options_key="models"),
+            Field("k", "Chunks per claim", "number", flag="--k", default=6, min=1, max=30, step=1),
+            Field("threshold", "Similarity threshold", "number", flag="--threshold",
+                  default=0.30, min=0.0, max=1.0, step=0.05),
+            Field("min_chars", "Skip claims shorter than", "number", flag="--min-chars",
+                  default=40, min=10, max=500, step=10),
+            Field("limit", "Max claims (optional)", "number", flag="--limit", min=1, max=500, step=1),
+            Field("as_json", "JSON output", "checkbox", flag="--json"),
+        ),
+        long_running=True,
+    ),
+
+    # ── Pipeline & meta ─────────────────────────────────────────────────────
+    ToolSpec(
+        name="pipeline",
+        label="Full pipeline",
+        category="pipeline",
+        description="Retrieve → draft → paraphrase → critique → verify → log. End-to-end paragraph production from a single question.",
+        fields=(
+            Field("question", "Question", "textarea", required=True, rows=3,
+                  placeholder="What approaches exist for NUMT filtering in clinical mtDNA?"),
+            Field("writer", "Writer model", "select", flag="--writer",
+                  default="claude", options_key="models"),
+            Field("paraphraser", "Paraphraser model", "select", flag="--paraphraser",
+                  default="gemini", options_key="models"),
+            Field("critic", "Critic model", "select", flag="--critic",
+                  default="sonnet", options_key="models"),
+            Field("k", "RAG chunks to retrieve", "number", flag="--k",
+                  default=12, min=1, max=50, step=1),
+            Field("threshold", "Similarity threshold", "number", flag="--threshold",
+                  default=0.30, min=0.0, max=1.0, step=0.05),
+            Field("temperature", "Temperature", "number", flag="--temperature",
+                  default=0.3, min=0.0, max=2.0, step=0.1),
+            Field("bib", "Bibliography", "text", flag="--bib", default="bib/thesis.bib"),
+            Field("no_verify", "Skip citation verifier", "checkbox", flag="--no-verify"),
+            Field("save", "Save report as", "text", flag="--save"),
+            Field("raw", "Raw output", "checkbox", flag="--raw"),
+        ),
+        long_running=True,
+    ),
+    ToolSpec(
+        name="disclose",
+        label="AI-usage disclosure",
+        category="meta",
+        description="Generate venue-ready AI-usage disclosure from your call logs (~/thesis/logs/ by default).",
+        fields=(
+            Field("since", "Since (YYYY-MM-DD, optional)", "text", flag="--since"),
+            Field("until", "Until (YYYY-MM-DD, optional)", "text", flag="--until"),
+            Field("venue", "Venue style", "select", flag="--venue", default="generic",
+                  options=("generic", "elsevier", "springer", "wiley", "nature", "ieee", "acm")),
+            Field("as_json", "JSON output", "checkbox", flag="--json"),
+            Field("save", "Save disclosure as", "text", flag="--save"),
+            Field("log_dir", "Log directory override", "text", flag="--log-dir"),
+        ),
+    ),
+)
+
+
+def get_spec(name: str) -> ToolSpec | None:
+    for spec in TOOL_SPECS:
+        if spec.name == name:
+            return spec
+    return None
+
+
+def specs_by_category() -> dict[str, list[ToolSpec]]:
+    """Group tools by category, preserving definition order within each."""
+    grouped: dict[str, list[ToolSpec]] = {}
+    for spec in TOOL_SPECS:
+        grouped.setdefault(spec.category, []).append(spec)
+    return grouped
+
+
+# ── Module name → Python import path ────────────────────────────────────────
+
+
+_MODULE_BY_NAME: Mapping[str, str] = {
+    # research subpackage
+    "single_ask": "research_assistant.research.ask",
+    "zot":        "research_assistant.research.zot",
+    "discover":   "research_assistant.research.discover",
+    "evidence":   "research_assistant.research.evidence",
+    # writing subpackage
+    "ideas":      "research_assistant.writing.ideas",
+    "outline":    "research_assistant.writing.outline",
+    "critique":   "research_assistant.writing.critique",
+    "critic":     "research_assistant.writing.critic",
+    "paraphrase": "research_assistant.writing.paraphrase",
+    "coherence":  "research_assistant.writing.coherence",
+    "disclose":   "research_assistant.writing.disclose",
+    # verification subpackage
+    "paraphrase_check": "research_assistant.verification.paraphrase_check",
+    "audit":            "research_assistant.verification.audit",
+    "verify":           "research_assistant.verification.verify",
+    "claim_verify":     "research_assistant.verification.claim_verify",
+    # top-level
+    "pipeline":   "research_assistant.pipeline",
+}
+
+
+def _argv_for(spec: ToolSpec, form: Mapping[str, Any], scratch_files: list[Path]) -> list[str]:
+    """Convert a form-data dict into the argv list expected by the Click command.
+
+    `scratch_files` accumulates temp files we created so the caller can clean up.
+    """
+    argv: list[str] = []
+
+    # First, collect positional arguments (flag is None) in declaration order
+    positionals: list[tuple[Field, Any]] = []
+    options: list[tuple[Field, Any]] = []
+    for fld in spec.fields:
+        raw = form.get(fld.name)
+        if fld.flag is None:
+            positionals.append((fld, raw))
+        else:
+            options.append((fld, raw))
+
+    for fld, raw in positionals:
+        value = _materialize_arg_value(fld, raw, scratch_files)
+        if value is None:
+            if fld.required:
+                raise ValueError(f"Field '{fld.label}' is required.")
+            continue
+        argv.append(str(value))
+
+    for fld, raw in options:
+        if fld.kind == "checkbox":
+            if _truthy(raw):
+                argv.append(fld.flag)  # type: ignore[arg-type]
+            continue
+        value = _materialize_arg_value(fld, raw, scratch_files)
+        if value is None or value == "":
+            continue
+        if fld.flag == "--sources":
+            # `--sources` is repeatable; split on lines
+            for line in str(value).splitlines():
+                line = line.strip()
+                if line:
+                    argv.extend([fld.flag, line])
+            continue
+        argv.extend([fld.flag, str(value)])  # type: ignore[list-item]
+
+    return argv
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).lower() in {"on", "true", "1", "yes"}
+
+
+def _materialize_arg_value(fld: Field, raw: Any, scratch_files: list[Path]) -> str | None:
+    """Convert form value to the string Click expects; write text→temp file when needed."""
+    if fld.kind == "file_or_text":
+        # form may contain both `name_text` (textarea) and `name_path` (path on disk).
+        # If the path is supplied, use it; otherwise spool the textarea into a temp file.
+        # The actual form keys come from the template (see tools.html).
+        text = (raw or "").strip() if isinstance(raw, str) else ""
+        path = ""
+        # See _collect_form for how these get combined.
+        if isinstance(raw, dict):
+            text = (raw.get("text") or "").strip()
+            path = (raw.get("path") or "").strip()
+        if path:
+            return path
+        if not text:
+            return None
+        suffix = ".md"
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=suffix, prefix=f"ra_{fld.name}_", delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(text)
+            tmp_name = tmp.name
+        scratch_files.append(Path(tmp_name))
+        return tmp_name
+
+    if raw is None or raw == "":
+        return None
+    if fld.kind == "number":
+        # Pass through as string; Click will coerce.
+        return str(raw)
+    return str(raw)
+
+
+def collect_form(spec: ToolSpec, form: Mapping[str, str]) -> dict[str, Any]:
+    """Group raw form keys into a per-field dict.
+
+    For `file_or_text` fields we expect two keys: `<name>_text` and `<name>_path`.
+    Other fields use the field name directly.
+    """
+    collected: dict[str, Any] = {}
+    for fld in spec.fields:
+        if fld.kind == "file_or_text":
+            collected[fld.name] = {
+                "text": form.get(f"{fld.name}_text", ""),
+                "path": form.get(f"{fld.name}_path", ""),
+            }
+        elif fld.kind == "checkbox":
+            collected[fld.name] = form.get(fld.name) in {"on", "true", "1", "yes"}
+        else:
+            collected[fld.name] = form.get(fld.name, "")
+    return collected
+
+
+@dataclass
+class ToolResult:
+    output: str
+    exit_code: int
+    argv: list[str]
+    error: str | None = None
+
+
+def run_tool(name: str, form_data: Mapping[str, str]) -> ToolResult:
+    """Invoke the tool's Click command with form-derived argv. Returns captured stdout."""
+    spec = get_spec(name)
+    if spec is None:
+        return ToolResult(output="", exit_code=2, argv=[], error=f"Unknown tool '{name}'.")
+
+    module_name = _MODULE_BY_NAME.get(name)
+    if module_name is None:
+        return ToolResult(output="", exit_code=2, argv=[], error=f"No module mapping for tool '{name}'.")
+
+    collected = collect_form(spec, form_data)
+    scratch: list[Path] = []
+    try:
+        argv = _argv_for(spec, collected, scratch)
+    except ValueError as exc:
+        return ToolResult(output="", exit_code=2, argv=[], error=str(exc))
+
+    try:
+        module = importlib.import_module(module_name)
+    except Exception as exc:
+        return ToolResult(output="", exit_code=1, argv=argv, error=f"Import failed: {exc}")
+
+    cmd = getattr(module, "main", None)
+    if cmd is None:
+        return ToolResult(output="", exit_code=1, argv=argv, error=f"Module '{module_name}' has no `main` Click command.")
+
+    runner = CliRunner(mix_stderr=False)
+    # Force monochrome / no-TTY output for rich-based modules.
+    env = {"FORCE_COLOR": "0", "NO_COLOR": "1", "TERM": "dumb"}
+    try:
+        result = runner.invoke(cmd, argv, catch_exceptions=True, env=env)
+    finally:
+        for path in scratch:
+            with contextlib.suppress(OSError):
+                os.unlink(path)
+
+    output = result.output or ""
+    err = None
+    if result.exit_code != 0:
+        # SystemExit on its own is just Click's normal exit channel — only treat
+        # it as an error if there's no usable stdout to show the user.
+        exc = result.exception
+        if exc is not None and not isinstance(exc, SystemExit):
+            err = f"{type(exc).__name__}: {exc}"
+        elif result.stderr_bytes:
+            stderr = result.stderr_bytes.decode("utf-8", errors="replace").strip()
+            if stderr:
+                err = stderr
+        elif not output.strip():
+            err = f"Tool exited with code {result.exit_code} and produced no output."
+
+    return ToolResult(output=output, exit_code=result.exit_code, argv=argv, error=err)

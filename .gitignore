@@ -6,4 +6,5 @@ logs/
 chroma_db/
 research_sessions/
 .pytest_cache/
+*.egg-info/
 __pycache__/

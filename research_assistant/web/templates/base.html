@@ -1,0 +1,72 @@
+{% macro nav_link(href, label, active) -%}
+    {%- set is_active = href == active or (href != '/' and active.startswith(href)) -%}
+    <a href="{{ href }}"
+       class="block px-2 py-1.5 rounded text-sm transition-colors
+              {% if is_active %}bg-indigo-50 text-indigo-700 font-medium{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+        {{ label }}
+    </a>
+{%- endmacro %}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Assistant{% if title %} — {{ title }}{% endif %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="h-full bg-slate-50 text-slate-800 antialiased font-sans">
+    <div class="flex h-full">
+        <!-- Sidebar -->
+        <nav class="w-64 shrink-0 border-r border-slate-200 bg-white overflow-y-auto">
+            <div class="p-5 border-b border-slate-200">
+                <a href="/" class="block">
+                    <h1 class="text-base font-semibold tracking-tight text-slate-900">Research Assistant</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">Thesis toolkit</p>
+                </a>
+            </div>
+
+            <div class="p-3 space-y-6">
+                {% set active = active_route or '' %}
+
+                <div>
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400 px-2 mb-2">Home</p>
+                    <ul class="space-y-0.5">
+                        <li>{{ nav_link("/", "Dashboard", active) }}</li>
+                        <li>{{ nav_link("/ask", "Ask (RAG)", active) }}</li>
+                        <li>{{ nav_link("/compare", "Compare models", active) }}</li>
+                        <li>{{ nav_link("/sessions", "Sessions", active) }}</li>
+                        <li>{{ nav_link("/index", "Manage index", active) }}</li>
+                    </ul>
+                </div>
+
+                {% for label, cat in [("Research", "research"), ("Writing", "writing"), ("Audit", "audit"), ("Pipeline", "pipeline"), ("Meta", "meta")] %}
+                    {% set tools_in_cat = tool_groups.get(cat, []) %}
+                    {% if tools_in_cat %}
+                    <div>
+                        <p class="text-[10px] uppercase tracking-wider text-slate-400 px-2 mb-2">{{ label }}</p>
+                        <ul class="space-y-0.5">
+                        {% for tool in tools_in_cat %}
+                            <li>{{ nav_link("/tools/" + tool.name, tool.label, active) }}</li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="p-4 border-t border-slate-200 mt-4">
+                <p class="text-[11px] text-slate-400">Research Assistant · v1.0</p>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="flex-1 overflow-y-auto">
+            <div class="max-w-6xl mx-auto px-8 py-8">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

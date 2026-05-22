@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from disclose import LogRecord, aggregate, load_logs, render_markdown
+from research_assistant.writing.disclose import LogRecord, aggregate, load_logs, render_markdown
 
 
 def _write_logs(tmp_path: Path, day: str, lines: list[dict]) -> None:

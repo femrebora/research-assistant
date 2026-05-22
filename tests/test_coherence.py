@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from coherence import build_paragraph_block, split_paragraphs
+from research_assistant.writing.coherence import build_paragraph_block, split_paragraphs
 
 
 class TestSplitParagraphs:

@@ -10,57 +10,105 @@
 
 A CLI toolkit + web UI for master's and PhD thesis research. Index your Zotero PDF library, ask research questions with cited answers from your own papers, compare answers across multiple AI models (Claude, Gemini, DeepSeek, GPT/Codex), and save everything for later paraphrasing.
 
-## What's here
+## Repository layout
 
-### Research
+```
+research-assistant/
+├── research_assistant/             # the Python package
+│   ├── __init__.py
+│   ├── common.py                   # MODELS, ask_model, file helpers, shared utils
+│   ├── researcher.py               # RAG: indexing + ask + sessions
+│   ├── pipeline.py                 # full orchestrator (retrieve → draft → … → verify)
+│   ├── research/                   # discovery & querying
+│   │   ├── ask.py                  # single-model ask
+│   │   ├── compare.py              # multi-model comparison
+│   │   ├── zot.py                  # Zotero search
+│   │   ├── discover.py             # OpenAlex / Semantic Scholar / Elicit
+│   │   └── evidence.py             # PaperQA2 queries
+│   ├── writing/                    # drafting + revision
+│   │   ├── ideas.py, outline.py
+│   │   ├── critique.py, critic.py, paraphrase.py
+│   │   ├── coherence.py
+│   │   └── disclose.py             # AI-usage disclosure
+│   ├── verification/               # audit + verify
+│   │   ├── audit.py                # citation audit
+│   │   ├── verify.py               # [@citekey] → .bib resolution
+│   │   ├── claim_verify.py         # semantic SUPPORTED/CONTRADICTED check
+│   │   └── paraphrase_check.py     # near-duplicate check vs. your sources
+│   └── web/                        # web + desktop UI
+│       ├── app.py                  # Flask app (dashboard, RAG, compare, sessions, tools)
+│       ├── desktop.py              # pywebview launcher (browser fallback)
+│       ├── tool_runner.py          # generic Click-command runner for /tools/<name>
+│       ├── templates/              # Tailwind + HTMX templates
+│       └── static/
+├── tests/                          # pytest suite (110+ tests)
+├── pyproject.toml                  # package metadata, deps, console scripts
+├── requirements.txt                # thin shim — install via `pip install -e ".[dev,desktop]"`
+├── setup.sh                        # one-command env setup
+├── env.example                     # template for .env
+└── .github/workflows/tests.yml     # CI: ruff + pytest on py3.11 & py3.12
+```
 
-| Script | Purpose |
-|--------|---------|
-| `researcher.py` | **RAG research assistant** — index Zotero PDFs into local vector store, ask questions with cited answers, compare models |
-| `compare.py` | **Multi-model comparison** — ask the same question to multiple AI models simultaneously, with or without document context |
-| `ask.py` | **Single-model queries** — ask any question to any configured model (Claude, Gemini, DeepSeek, GPT, local) |
-| `zot.py` | **Zotero search** — search your Zotero library from terminal |
-| `evidence.py` | **PaperQA2 queries** — query your PDFs via PaperQA2, save cited output |
-| `discover.py` | **External paper discovery** — find new papers via OpenAlex, Semantic Scholar, or Elicit |
+### Console scripts (after `pip install -e .`)
 
-### Writing pipeline
+| Command            | What it does                                            |
+|--------------------|---------------------------------------------------------|
+| `ra-web`           | Start the Flask web UI (default http://127.0.0.1:5050)  |
+| `ra-desktop`       | Open the same UI in a native OS window (pywebview)      |
+| `ra-researcher`    | RAG: `index`, `ask`, `sessions`, `stats` subcommands    |
+| `ra-pipeline`      | Full draft → paraphrase → critique → verify orchestrator|
+| `ra-ask`           | Single-model question                                   |
+| `ra-compare`       | Multi-model comparison (`--rag` for indexed context)    |
+| `ra-zot`           | Zotero search                                           |
+| `ra-discover`      | Find new papers via OpenAlex / Semantic Scholar / Elicit|
+| `ra-evidence`      | PaperQA2 cited query                                    |
+| `ra-ideas`         | Paragraph angles from evidence + job                    |
+| `ra-outline`       | Hierarchical section outline with citation stubs        |
+| `ra-critique`      | Draft critique (prose or sentence-anchored)             |
+| `ra-critic`        | Writer + critic 2-model pipeline                        |
+| `ra-paraphrase`    | Writer → paraphraser → checker 3-model pipeline         |
+| `ra-coherence`     | Whole-chapter transitions / thesis support / redundancy |
+| `ra-paraphrase-check` | Flag paragraphs too similar to your own sources      |
+| `ra-audit`         | Citation density, over-cites, unused .bib entries       |
+| `ra-verify`        | `[@citekey]` resolution against your .bib               |
+| `ra-claim-verify`  | Per-claim SUPPORTED / PARTIAL / UNSUPPORTED / CONTRADICTED |
+| `ra-disclose`      | Venue-ready AI-usage disclosure from your call logs     |
 
-| Script | Purpose |
-|--------|---------|
-| `ideas.py` | **Paragraph angles** — get paragraph angles given evidence + a job statement |
-| `outline.py` | **Section outline** — hierarchical outline with citation stubs from evidence + a job |
-| `critique.py` | **Draft critique** — prose or sentence-anchored diff critique of a paragraph you've written |
-| `critic.py` | **Writer + critic** — one model drafts, another critiques (2-model pipeline) |
-| `paraphrase.py` | **Writer → paraphraser → checker** — 3-model paraphrase pipeline with meaning verification |
-| `coherence.py` | **Multi-paragraph flow** — check chapter-level transitions, redundancy, thesis support |
-| `paraphrase_check.py` | **Near-duplicate check** — flag draft paragraphs too similar to your own indexed sources |
-| `audit.py` | **Citation audit** — per-source counts, over-cited papers, unused .bib entries, density |
-| `verify.py` | **Citation verification** — check all `[@citekey]` placeholders resolve in your `.bib` |
-| `claim_verify.py` | **Semantic claim audit** — per-claim, RAG-backed SUPPORTED / PARTIAL / UNSUPPORTED / CONTRADICTED check |
-| `pipeline.py` | **Full orchestrator** — retrieve → draft → paraphrase → critique → verify → log |
-| `disclose.py` | **AI usage disclosure** — generate venue-ready disclosure from your call logs |
+### Web / desktop UI
 
-### Web UI
+The web UI exposes the dashboard, RAG `ask`, multi-model `compare`, sessions/index management,
+plus a generic form page for every CLI tool above (`/tools/<name>`). Each form accepts pasted
+text **or** a path on disk for the `*_FILE` arguments. Results are captured stdout from the
+same Click commands the CLI uses — same output, same exit codes.
 
-| Script | Purpose |
-|--------|---------|
-| `app.py` | **Web UI** — Flask web interface for the research assistant |
+```bash
+ra-web                # browser at http://127.0.0.1:5050
+ra-desktop            # native window (falls back to your browser if pywebview missing)
+```
 
 ## Quick Start
 
-### 1. Clone and set up
+### 1. Clone
 
 ```bash
 git clone https://github.com/femrebora/research-assistant
 cd research-assistant
 ```
 
-### 2. Create Python virtual environment
+### 2. Install (creates ~/.venvs/thesis and installs the package)
+
+```bash
+./setup.sh
+source ~/.venvs/thesis/bin/activate
+```
+
+Manual install (skip setup.sh):
 
 ```bash
 python3 -m venv ~/.venvs/thesis
 source ~/.venvs/thesis/bin/activate
-pip install -r requirements.txt
+pip install --upgrade pip
+pip install -e ".[dev,desktop]"
 ```
 
 ### 3. Configure environment
@@ -78,7 +126,7 @@ GEMINI_API_KEY=...
 DEEPSEEK_API_KEY=sk-...
 OPENAI_API_KEY=sk-...
 
-# Zotero integration (for researcher.py and zot.py)
+# Zotero integration (for ra-researcher and ra-zot)
 ZOTERO_USER_ID=1234567
 ZOTERO_API_KEY=...
 
@@ -91,16 +139,16 @@ ZOTERO_STORAGE=/home/you/Zotero/storage
 
 ```bash
 # Index all Zotero PDFs (one-time, takes a few minutes)
-./researcher.py index
+ra-researcher index
 
 # Or index a specific collection
-./researcher.py index --collection "Chapter 1" --limit 20
+ra-researcher index --collection "Chapter 1" --limit 20
 ```
 
 ### 5. Ask your first question
 
 ```bash
-./researcher.py ask "What are the main approaches to filtering NUMT in clinical mtDNA?"
+ra-researcher ask "What are the main approaches to filtering NUMT in clinical mtDNA?"
 ```
 
 ## CLI Usage
@@ -109,93 +157,93 @@ ZOTERO_STORAGE=/home/you/Zotero/storage
 
 ```bash
 # Index management
-./researcher.py index                          # Index all Zotero PDFs
-./researcher.py index --collection "Ch. 1"     # Index a specific collection
-./researcher.py index --force                   # Re-index everything
-./researcher.py index --limit 50               # Index first 50 items only
-./researcher.py stats                          # View index statistics
+ra-researcher index                          # Index all Zotero PDFs
+ra-researcher index --collection "Ch. 1"     # Index a specific collection
+ra-researcher index --force                   # Re-index everything
+ra-researcher index --limit 50               # Index first 50 items only
+ra-researcher stats                          # View index statistics
 
 # Ask questions with cited, paraphrase-ready answers
-./researcher.py ask "What is NUMT contamination?"
-./researcher.py ask "..." --model gemini        # Use a different model
-./researcher.py ask "..." --k 10               # Retrieve fewer chunks
-./researcher.py ask "..." --threshold 0.4      # Stricter relevance filter
-./researcher.py ask "..." --save session_name  # Save Q&A to a session file
-./researcher.py ask "..." --raw                # Plain text output (for piping)
+ra-researcher ask "What is NUMT contamination?"
+ra-researcher ask "..." --model gemini        # Use a different model
+ra-researcher ask "..." --k 10               # Retrieve fewer chunks
+ra-researcher ask "..." --threshold 0.4      # Stricter relevance filter
+ra-researcher ask "..." --save session_name  # Save Q&A to a session file
+ra-researcher ask "..." --raw                # Plain text output (for piping)
 
 # Compare answers from multiple models (same RAG context)
-./researcher.py ask "..." --compare claude,gemini,gpt
-./researcher.py ask "..." --compare claude,deepseek --save comparison
+ra-researcher ask "..." --compare claude,gemini,gpt
+ra-researcher ask "..." --compare claude,deepseek --save comparison
 
 # Browse past sessions
-./researcher.py sessions                        # List all sessions
-./researcher.py sessions --view session_name    # View a session
-./researcher.py sessions --view last            # View most recent session
+ra-researcher sessions                        # List all sessions
+ra-researcher sessions --view session_name    # View a session
+ra-researcher sessions --view last            # View most recent session
 ```
 
 ### Compare — Multi-model comparison
 
 ```bash
 # Direct comparison (no document context)
-./compare.py "What is NUMT?" --models claude,gemini,gpt
-./compare.py "..." --models claude,sonnet,haiku,gemini,deepseek,gpt
+ra-compare "What is NUMT?" --models claude,gemini,gpt
+ra-compare "..." --models claude,sonnet,haiku,gemini,deepseek,gpt
 
 # RAG comparison (same context from your indexed papers)
-./compare.py "What approaches exist for NUMT filtering?" --models claude,gemini --rag
-./compare.py "..." --models claude,gpt --rag --k 15 --threshold 0.4
+ra-compare "What approaches exist for NUMT filtering?" --models claude,gemini --rag
+ra-compare "..." --models claude,gpt --rag --k 15 --threshold 0.4
 
 # Save comparison to session
-./compare.py "..." --models claude,gemini,gpt --save my_comparison
+ra-compare "..." --models claude,gemini,gpt --save my_comparison
 ```
 
 ### Other tools
 
 ```bash
 # Ask a single model (quick questions)
-./ask.py "Explain MitoScape's filtering approach" --model claude
-./ask.py "Same question" --model gemini           # Second opinion
-./ask.py "Same question" --model deepseek          # Cheaper option
+ra-ask "Explain MitoScape's filtering approach" --model claude
+ra-ask "Same question" --model gemini           # Second opinion
+ra-ask "Same question" --model deepseek          # Cheaper option
 
 # Search Zotero library
-./zot.py "NUMT contamination"
-./zot.py "MitoScape" --limit 20 --bib             # Just citekeys
+ra-zot "NUMT contamination"
+ra-zot "MitoScape" --limit 20 --bib             # Just citekeys
 
 # Evidence query via PaperQA2
-./evidence.py "What evidence exists for NUMT affecting variant calling?" --save evidence/ch1.md
+ra-evidence "What evidence exists for NUMT affecting variant calling?" --save evidence/ch1.md
 
 # Discover new papers from OpenAlex / Semantic Scholar / Elicit
-./discover.py "NUMT filtering clinical mtDNA" --source openalex --limit 15
-./discover.py "..." --source semantic_scholar --year-from 2020
-./discover.py "..." --export bibtex > new_papers.bib
+ra-discover "NUMT filtering clinical mtDNA" --source openalex --limit 15
+ra-discover "..." --source semantic_scholar --year-from 2020
+ra-discover "..." --export bibtex > new_papers.bib
 ```
 
 ### Writing pipeline
 
 ```bash
 # 1. Get paragraph angles from evidence
-./ideas.py evidence/ch1/numt.md --job "Establish NUMT as clinically significant"
+ra-ideas evidence/ch1/numt.md --job "Establish NUMT as clinically significant"
 
 # 2. Or generate a full hierarchical outline (one stub per paragraph)
-./outline.py evidence/ch1/numt.md \
+ra-outline evidence/ch1/numt.md \
     --job "Argue NUMT filtering is mandatory in clinical mtDNA pipelines" \
     --sections 4 --depth 2 --save outlines/ch1.md
 
 # 3. Critique your draft paragraph (prose mode or sentence-anchored)
-./critique.py drafts/para.md --job "Define NUMT contamination"
-./critique.py drafts/para.md --job "..." --diff           # S1, S2, ... annotations
+ra-critique drafts/para.md --job "Define NUMT contamination"
+ra-critique drafts/para.md --job "..." --diff           # S1, S2, ... annotations
 
 # 4. Check whole-chapter coherence and thesis support
-./coherence.py drafts/chapter1.md \
+ra-coherence drafts/chapter1.md \
     --thesis "NUMT filtering is mandatory for clinical mtDNA pipelines"
 
 # 5. Catch paragraphs that drifted too close to source wording
-./paraphrase_check.py drafts/chapter1.md --threshold 0.85
+ra-paraphrase-check drafts/chapter1.md --threshold 0.85
 
 # 6. Audit citation usage (density, over-cites, unused .bib entries)
-./audit.py drafts/chapter1.md --bib bib/thesis.bib --over-cite 6
+ra-audit drafts/chapter1.md --bib bib/thesis.bib --over-cite 6
 
 # 7. Verify citations resolve to the .bib (catches typos / hallucinations)
-./verify.py drafts/chapter1.md --bib bib/thesis.bib
+ra-verify drafts/chapter1.md --bib bib/thesis.bib
 ```
 
 ### Multi-model writing pipeline
@@ -220,7 +268,7 @@ Each stage is logged to `~/thesis/logs/YYYY-MM-DD.jsonl` automatically, so the e
 
 ```bash
 # The exact form from my_request:
-./paraphrase.py "Define NUMT contamination" \
+ra-paraphrase "Define NUMT contamination" \
     --writer claude \
     --paraphraser gemini \
     --checker gpt \
@@ -228,7 +276,7 @@ Each stage is logged to `~/thesis/logs/YYYY-MM-DD.jsonl` automatically, so the e
     --save outputs/numt_para.md
 
 # Skip the writer stage and paraphrase a draft you already wrote:
-./paraphrase.py drafts/para.md --skip-writer \
+ra-paraphrase drafts/para.md --skip-writer \
     --paraphraser claude --checker gpt
 ```
 
@@ -275,7 +323,7 @@ Tip: combine `--interactive` with mixed API/CLI models. You can let `claude` dra
 Two-model pipeline: one model drafts a paragraph, a **different** model critiques it. Useful for stress-testing prompts or getting an adversarial second read of an AI-generated paragraph. (Distinct from `critique.py`, which critiques text *you* wrote.)
 
 ```bash
-./critic.py "Define NUMT contamination" \
+ra-critic "Define NUMT contamination" \
     --writer claude \
     --critic gpt \
     --sources evidence/ch1.md \
@@ -302,10 +350,10 @@ Where `verify.py` only checks that `[@citekey]` placeholders exist in your `.bib
 Labels: **SUPPORTED · PARTIAL · UNSUPPORTED · CONTRADICTED**.
 
 ```bash
-./claim_verify.py drafts/chapter1.md
-./claim_verify.py drafts/chapter1.md --k 6 --model sonnet --threshold 0.30
-./claim_verify.py drafts/chapter1.md --json > claim_audit.json
-./claim_verify.py drafts/chapter1.md --limit 10  # dry-run on first 10 claims
+ra-claim-verify drafts/chapter1.md
+ra-claim-verify drafts/chapter1.md --k 6 --model sonnet --threshold 0.30
+ra-claim-verify drafts/chapter1.md --json > claim_audit.json
+ra-claim-verify drafts/chapter1.md --limit 10  # dry-run on first 10 claims
 ```
 
 | Flag | Default | What it does |
@@ -333,14 +381,14 @@ The 6-step chain from `my_request`, in one command:
 6. AI-usage log entry (automatic; every model call is recorded).
 
 ```bash
-./pipeline.py "What is NUMT contamination?" \
+ra-pipeline "What is NUMT contamination?" \
     --writer claude \
     --paraphraser gemini \
     --critic gpt \
     --save outputs/numt_run.md
 
 # Skip the citation verifier (e.g. you haven't built the .bib yet):
-./pipeline.py "..." --writer claude --paraphraser gemini --critic gpt --no-verify
+ra-pipeline "..." --writer claude --paraphraser gemini --critic gpt --no-verify
 ```
 
 | Flag | Default | What it does |
@@ -363,11 +411,11 @@ The verifier embedded in this pipeline is the lightweight citekey check from `ve
 Aggregates `~/thesis/logs/*.jsonl` into a publication-ready disclosure of which models were used, how often, and at what cost.
 
 ```bash
-./disclose.py                                          # generic template, console preview
-./disclose.py --venue elsevier --save logs/disclosure.md
-./disclose.py --venue thesis --since 2026-01-01 --until 2026-05-22
-./disclose.py --json --save logs/disclosure.json       # machine-readable
-./disclose.py --log-dir /path/to/other/logs            # override log location
+ra-disclose                                          # generic template, console preview
+ra-disclose --venue elsevier --save logs/disclosure.md
+ra-disclose --venue thesis --since 2026-01-01 --until 2026-05-22
+ra-disclose --json --save logs/disclosure.json       # machine-readable
+ra-disclose --log-dir /path/to/other/logs            # override log location
 ```
 
 | Flag | Default | What it does |
@@ -394,7 +442,7 @@ You can mix freely on a per-stage basis:
 
 ```bash
 # Draft via API, paraphrase via CLI subscription, check on local Ollama.
-./paraphrase.py "Define NUMT contamination" \
+ra-paraphrase "Define NUMT contamination" \
     --writer claude \
     --paraphraser gemini-cli \
     --checker ollama-cli \
@@ -402,11 +450,11 @@ You can mix freely on a per-stage basis:
     --interactive
 
 # Three CLI subscriptions side-by-side:
-./compare.py "What is NUMT?" --models claude-cli,gemini-cli,codex-cli
+ra-compare "What is NUMT?" --models claude-cli,gemini-cli,codex-cli
 
 # Single-shot via any local binary:
-./ask.py "Explain MitoScape's filtering approach" --model claude-cli
-./ask.py "Same question" --model ollama-cli
+ra-ask "Explain MitoScape's filtering approach" --model claude-cli
+ra-ask "Same question" --model ollama-cli
 ```
 
 #### CLI alias reference
@@ -426,7 +474,7 @@ CLAUDE_CLI_CMD="claude -p --output-format text"
 GEMINI_CLI_CMD="gemini --model gemini-2.5-flash -p"
 OLLAMA_CLI_CMD="ollama run qwen2.5"
 CLI_TIMEOUT=900     # seconds; default 600
-EDITOR=nvim         # used by ./paraphrase.py --interactive
+EDITOR=nvim         # used by ra-paraphrase --interactive
 ```
 
 #### CLI prerequisites
@@ -437,7 +485,7 @@ Before you can use a `*-cli` alias:
 2. **Authenticate it once.** Run the binary's own login flow (e.g. `claude login`, `gemini auth`, `codex auth`, or just leave Ollama running locally). The router only invokes the binary — it doesn't manage auth.
 3. **Test it with one call** before threading it into the pipeline:
    ```bash
-   ./ask.py "Say hello in five words" --model gemini-cli
+   ra-ask "Say hello in five words" --model gemini-cli
    ```
    If the binary isn't found, you'll get a clean error pointing at the `*_CLI_CMD` env var to override.
 
@@ -486,50 +534,50 @@ Edit the `MODELS` dict (or `CLI_PROVIDERS` for CLI aliases) in `common.py` to ch
 
 ```bash
 # 1. Index your Zotero library (once)
-./researcher.py index
+ra-researcher index
 
 # 2. (Optional) Discover papers you don't have yet
-./discover.py "NUMT contamination clinical mtDNA" --year-from 2020 --export bibtex >> new.bib
+ra-discover "NUMT contamination clinical mtDNA" --year-from 2020 --export bibtex >> new.bib
 
 # 3. Research a topic — ask questions, save sessions
-./researcher.py ask "What are the clinical implications of NUMT contamination?" --save numt_clinical
-./researcher.py ask "What tools exist for NUMT detection?" --session numt_clinical
-./researcher.py ask "What are the limitations of current approaches?" --session numt_clinical
+ra-researcher ask "What are the clinical implications of NUMT contamination?" --save numt_clinical
+ra-researcher ask "What tools exist for NUMT detection?" --session numt_clinical
+ra-researcher ask "What are the limitations of current approaches?" --session numt_clinical
 
 # 4. Compare model perspectives on tricky questions
-./compare.py "Is NUMT filtering necessary for clinical mtDNA sequencing?" --models claude,gemini,gpt --rag
+ra-compare "Is NUMT filtering necessary for clinical mtDNA sequencing?" --models claude,gemini,gpt --rag
 
 # 5. Get evidence for a specific paragraph
-./evidence.py "NUMT filtering methods comparison" --save evidence/ch1/numt_methods.md
+ra-evidence "NUMT filtering methods comparison" --save evidence/ch1/numt_methods.md
 
 # 6. Plan: paragraph angles + (optional) full outline
-./ideas.py evidence/ch1/numt_methods.md --job "Compare NUMT detection tools"
-./outline.py evidence/ch1/numt_methods.md --job "Compare NUMT detection tools" --sections 3
+ra-ideas evidence/ch1/numt_methods.md --job "Compare NUMT detection tools"
+ra-outline evidence/ch1/numt_methods.md --job "Compare NUMT detection tools" --sections 3
 
 # 7. Write your paragraph yourself (in your editor / Google Docs)
 
 # 8. Critique your draft — paragraph by paragraph
-./critique.py drafts/ch1_para_3.md --job "Compare NUMT detection tools"
-./critique.py drafts/ch1_para_3.md --job "..." --diff       # sentence-anchored
+ra-critique drafts/ch1_para_3.md --job "Compare NUMT detection tools"
+ra-critique drafts/ch1_para_3.md --job "..." --diff       # sentence-anchored
 
 # 9. When the chapter is assembled, run the pre-submission gauntlet
-./coherence.py drafts/chapter1.md --thesis "NUMT filtering is mandatory in clinical mtDNA"
-./paraphrase_check.py drafts/chapter1.md --threshold 0.85
-./audit.py drafts/chapter1.md --bib bib/thesis.bib
-./verify.py drafts/chapter1.md --bib bib/thesis.bib
-./claim_verify.py drafts/chapter1.md --k 6 --model sonnet     # semantic per-claim audit
+ra-coherence drafts/chapter1.md --thesis "NUMT filtering is mandatory in clinical mtDNA"
+ra-paraphrase-check drafts/chapter1.md --threshold 0.85
+ra-audit drafts/chapter1.md --bib bib/thesis.bib
+ra-verify drafts/chapter1.md --bib bib/thesis.bib
+ra-claim-verify drafts/chapter1.md --k 6 --model sonnet     # semantic per-claim audit
 
 # 10. (Optional) End-to-end: retrieve → draft → paraphrase → critique → verify, interactively.
-./pipeline.py "What is NUMT contamination?" \
+ra-pipeline "What is NUMT contamination?" \
     --writer claude --paraphraser gemini-cli --critic gpt \
     --save outputs/numt_run.md
 # Or run the 3-model paraphrase step on its own with mid-flight editing:
-./paraphrase.py "Define NUMT contamination" \
+ra-paraphrase "Define NUMT contamination" \
     --writer claude --paraphraser gemini --checker gpt \
     --sources evidence/ch1.md --interactive --save outputs/numt_para.md
 
 # 11. Generate the AI-usage disclosure for submission.
-./disclose.py --venue thesis --save thesis/appendix_disclosure.md
+ra-disclose --venue thesis --save thesis/appendix_disclosure.md
 ```
 
 ## Architecture
@@ -568,7 +616,7 @@ All model calls (every script, every model, both API and CLI routes) append one 
  "input_tokens": null, "output_tokens": null}
 ```
 
-For venues requiring AI-usage disclosure, run [`./disclose.py`](#disclosepy--ai-usage-disclosure) (templates for `generic`, `elsevier`, `springer`, `acm`, and `thesis`) or use the `/ars-disclosure` command if the academic-research-skills plugin is installed. API and CLI calls are reported separately in both the table and the totals line.
+For venues requiring AI-usage disclosure, run [`ra-disclose`](#disclosepy--ai-usage-disclosure) (templates for `generic`, `elsevier`, `springer`, `acm`, and `thesis`) or use the `/ars-disclosure` command if the academic-research-skills plugin is installed. API and CLI calls are reported separately in both the table and the totals line.
 
 ## FAQ
 
@@ -585,13 +633,13 @@ Currently, no. The indexer uses the Zotero API for metadata (authors, citekeys, 
 Scanned/image-only PDFs are skipped with a warning. Use OCR first.
 
 **Q: Can I use a local embedding model?**
-Yes. Change `DEFAULT_EMBED_MODEL` in `researcher.py` to `"ollama/nomic-embed-text"` or any LiteLLM-supported embedding model.
+Yes. Change `DEFAULT_EMBED_MODEL` in `research_assistant/researcher.py` to `"ollama/nomic-embed-text"` or any LiteLLM-supported embedding model.
 
 **Q: How do I update the index after adding new papers to Zotero?**
-Run `./researcher.py index` again. Already-indexed papers are skipped (checked by Zotero item key). Use `--force` to re-index everything.
+Run `ra-researcher index` again. Already-indexed papers are skipped (checked by Zotero item key). Use `--force` to re-index everything.
 
 **Q: When should I use a `*-cli` alias vs. the API alias?**
-Use `claude-cli` / `gemini-cli` / `codex-cli` when you already pay for the corresponding CLI subscription and want those calls to flow through it instead of a per-token API bill. Use the API aliases (`claude`, `gemini`, `gpt`) when you want exact token + cost reporting in `./disclose.py`, when you're scripting unattended runs (CLIs sometimes prompt for re-auth), or when the API model version differs from the CLI's pinned version. You can mix freely: `--writer claude --paraphraser gemini-cli --checker codex-cli` is fine.
+Use `claude-cli` / `gemini-cli` / `codex-cli` when you already pay for the corresponding CLI subscription and want those calls to flow through it instead of a per-token API bill. Use the API aliases (`claude`, `gemini`, `gpt`) when you want exact token + cost reporting in `ra-disclose`, when you're scripting unattended runs (CLIs sometimes prompt for re-auth), or when the API model version differs from the CLI's pinned version. You can mix freely: `--writer claude --paraphraser gemini-cli --checker codex-cli` is fine.
 
 **Q: What if my CLI binary isn't on `$PATH` or uses different flags?**
 Override the full command with the matching env var in `.env`:
@@ -608,7 +656,7 @@ Set `EDITOR` (or `VISUAL`) in `.env` or your shell. `paraphrase.py --interactive
 If you passed `--save outputs/run.md`, the file is written only after all three stages finish, so a crash mid-run drops the partial work. Either re-run (regenerate is cheap), or — for paragraph-by-paragraph control — copy the writer output out of the terminal between stages.
 
 **Q: Are CLI calls counted in my AI-usage disclosure?**
-Yes. Every CLI call appends a log line with `"via": "cli"` and is shown as a separate row in `./disclose.py` (route column = `cli`). Token counts and dollar cost are blank for CLI calls because the CLIs don't surface tokens; the disclosure makes the subscription nature explicit ("n/a (CLI subscription)").
+Yes. Every CLI call appends a log line with `"via": "cli"` and is shown as a separate row in `ra-disclose` (route column = `cli`). Token counts and dollar cost are blank for CLI calls because the CLIs don't surface tokens; the disclosure makes the subscription nature explicit ("n/a (CLI subscription)").
 
 **Q: Can I run the full pipeline non-interactively for batch use?**
 Yes. Don't pass `--interactive` and the pipeline runs end-to-end without prompts. For unattended jobs, prefer API aliases (CLIs may stall waiting for re-auth) and use `--save` so the output file is the single source of truth.

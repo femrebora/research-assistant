@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from claim_verify import _parse_label_block, extract_claims
+from research_assistant.verification.claim_verify import _parse_label_block, extract_claims
 
 
 class TestExtractClaims:

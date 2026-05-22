@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-semibold text-slate-900">Sessions</h2>
+    <p class="text-sm text-slate-500 mt-1">Saved questions, comparisons, and pipeline runs.</p>
+</div>
+
+{% if session_content %}
+<div class="bg-white rounded-lg border border-slate-200 p-5">
+    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <h3 class="text-base font-semibold text-slate-900">{{ session_name }}</h3>
+        <form action="/sessions/{{ session_name }}/delete" method="POST"
+              onsubmit="return confirm('Delete this session?')">
+            <button type="submit"
+                    class="px-3 py-1.5 text-xs font-medium rounded-md bg-rose-50 text-rose-700 hover:bg-rose-100 transition">
+                Delete
+            </button>
+        </form>
+    </div>
+    <div class="prose prose-slate max-w-none text-sm leading-relaxed">
+        {{ session_content | safe }}
+    </div>
+    <p class="mt-5 pt-4 border-t border-slate-100"><a href="/sessions" class="text-sm text-indigo-600 hover:underline">← Back to all sessions</a></p>
+</div>
+{% else %}
+    {% if sessions %}
+    <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+                <tr>
+                    <th class="px-4 py-2 text-left font-medium">Name</th>
+                    <th class="px-4 py-2 text-left font-medium">Questions</th>
+                    <th class="px-4 py-2 text-left font-medium">Last question</th>
+                    <th class="px-4 py-2 text-left font-medium">Modified</th>
+                    <th class="px-4 py-2"></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+            {% for s in sessions %}
+            <tr class="hover:bg-slate-50">
+                <td class="px-4 py-2.5"><a href="/sessions/{{ s.name }}" class="font-medium text-slate-900 hover:text-indigo-600">{{ s.name }}</a></td>
+                <td class="px-4 py-2.5 text-slate-700">{{ s.questions }}</td>
+                <td class="px-4 py-2.5 text-slate-500">{{ s.last_question[:70] }}{% if s.last_question|length > 70 %}…{% endif %}</td>
+                <td class="px-4 py-2.5 text-slate-500">{{ s.modified[:10] }}</td>
+                <td class="px-4 py-2.5 text-right">
+                    <form action="/sessions/{{ s.name }}/delete" method="POST" onsubmit="return confirm('Delete {{ s.name }}?')">
+                        <button type="submit" class="px-2 py-1 text-xs rounded text-rose-700 hover:bg-rose-50 transition">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-lg border border-slate-200 p-8 text-center">
+        <p class="text-sm text-slate-500">No sessions yet. <a href="/ask" class="text-indigo-600 hover:underline">Ask a question</a> and save it.</p>
+    </div>
+    {% endif %}
+{% endif %}
+{% endblock %}
