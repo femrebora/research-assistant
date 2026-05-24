@@ -414,6 +414,38 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         long_running=True,
     ),
 
+    ToolSpec(
+        name="originality",
+        label="Originality check",
+        category="audit",
+        description=(
+            "Flag paragraphs that look too similar to (a) your own indexed library "
+            "or (b) published abstracts on OpenAlex / Crossref. Not a true plagiarism "
+            "detector -- it produces leads for human review."
+        ),
+        fields=(
+            Field("draft_file", "Draft", "file_or_text", required=True, rows=14,
+                  help="Paste the chapter / section text, or supply a path under THESIS_ROOT."),
+            Field("sources", "Sources to check", "text", flag="--sources",
+                  default="internal,openalex,crossref",
+                  help=("Comma-separated subset of internal, openalex, crossref. "
+                        "Internal checks your indexed Zotero papers; the other two query "
+                        "published academic abstracts.")),
+            Field("internal_threshold", "Internal similarity threshold", "number",
+                  flag="--internal-threshold", default=0.85, min=0.5, max=1.0, step=0.01,
+                  help="Higher = stricter. 0.85 catches near-verbatim; 0.75 catches close paraphrase."),
+            Field("external_threshold", "External similarity threshold", "number",
+                  flag="--external-threshold", default=0.80, min=0.5, max=1.0, step=0.01,
+                  help="Cosine similarity between your paragraph and the matched abstract."),
+            Field("min_chars", "Skip paragraphs shorter than", "number", flag="--min-chars",
+                  default=150, min=10, max=500, step=10,
+                  help="Tiny paragraphs are too noisy to check reliably."),
+            Field("as_json", "JSON output", "checkbox", flag="--json",
+                  help="Output as JSON instead of the rendered table."),
+        ),
+        long_running=True,
+    ),
+
     # ── Pipeline & meta ─────────────────────────────────────────────────────
     ToolSpec(
         name="pipeline",
@@ -514,6 +546,7 @@ _MODULE_BY_NAME: Mapping[str, str] = {
     "audit":            "research_assistant.verification.audit",
     "verify":           "research_assistant.verification.verify",
     "claim_verify":     "research_assistant.verification.claim_verify",
+    "originality":      "research_assistant.verification.originality",
     # top-level
     "pipeline":   "research_assistant.pipeline",
 }
