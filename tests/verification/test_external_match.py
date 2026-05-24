@@ -51,3 +51,37 @@ def test_search_openalex_returns_parsed_matches():
     assert m["authors"] == "Doe, Jane"
     assert "NUMT contamination is common" in m["abstract"]
     assert m["url"] == "https://openalex.org/W123"
+
+
+CROSSREF_FIXTURE = {
+    "message": {
+        "items": [
+            {
+                "DOI": "10.5678/another",
+                "title": ["A second NUMT study"],
+                "abstract": "<jats:p>NUMTs interfere with variant calling.</jats:p>",
+                "issued": {"date-parts": [[2023]]},
+                "author": [{"given": "Alice", "family": "Smith"}],
+                "URL": "https://doi.org/10.5678/another",
+            }
+        ]
+    }
+}
+
+
+@pytest.mark.unit
+def test_search_crossref_returns_parsed_matches():
+    from research_assistant.verification.external_match import search_crossref
+
+    fake = type("R", (), {"json": lambda self: CROSSREF_FIXTURE, "raise_for_status": lambda self: None})()
+    with patch("research_assistant.verification.external_match.httpx.get", return_value=fake):
+        results = search_crossref("NUMT interfere variant calling", limit=5)
+
+    assert len(results) == 1
+    m = results[0]
+    assert m["title"] == "A second NUMT study"
+    assert m["year"] == 2023
+    assert m["doi"] == "10.5678/another"
+    assert m["authors"] == "Smith, Alice"
+    assert "NUMTs interfere with variant calling." in m["abstract"]   # JATS stripped
+    assert m["url"] == "https://doi.org/10.5678/another"
