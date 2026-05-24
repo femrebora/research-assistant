@@ -15,9 +15,10 @@ def test_cli_runs_with_minimal_args(tmp_path, monkeypatch):
     draft.write_text("Long enough paragraph. " * 30, encoding="utf-8")
 
     # Bypass all real I/O: every source returns no matches.
-    monkeypatch.setattr(orig, "_internal_matches", lambda p, t: [])
-    monkeypatch.setattr(orig, "_external_matches_openalex", lambda p, t: [])
-    monkeypatch.setattr(orig, "_external_matches_crossref", lambda p, t: [])
+    monkeypatch.setattr(orig, "_embed_safe", lambda t: [0.0] * 768)
+    monkeypatch.setattr(orig, "_internal_matches", lambda p, t, **kw: [])
+    monkeypatch.setattr(orig, "_external_matches_openalex", lambda p, t, **kw: [])
+    monkeypatch.setattr(orig, "_external_matches_crossref", lambda p, t, **kw: [])
 
     runner = CliRunner()
     result = runner.invoke(orig.main, [str(draft), "--json"])
@@ -35,12 +36,13 @@ def test_cli_filters_sources(tmp_path, monkeypatch):
     draft.write_text("Long enough paragraph. " * 30, encoding="utf-8")
 
     called = {"internal": 0, "openalex": 0, "crossref": 0}
+    monkeypatch.setattr(orig, "_embed_safe", lambda t: [0.0] * 768)
     monkeypatch.setattr(orig, "_internal_matches",
-                        lambda p, t: called.__setitem__("internal", called["internal"] + 1) or [])
+                        lambda p, t, **kw: called.__setitem__("internal", called["internal"] + 1) or [])
     monkeypatch.setattr(orig, "_external_matches_openalex",
-                        lambda p, t: called.__setitem__("openalex", called["openalex"] + 1) or [])
+                        lambda p, t, **kw: called.__setitem__("openalex", called["openalex"] + 1) or [])
     monkeypatch.setattr(orig, "_external_matches_crossref",
-                        lambda p, t: called.__setitem__("crossref", called["crossref"] + 1) or [])
+                        lambda p, t, **kw: called.__setitem__("crossref", called["crossref"] + 1) or [])
 
     runner = CliRunner()
     result = runner.invoke(orig.main, [str(draft), "--sources", "openalex"])

@@ -196,8 +196,15 @@ def _render_markdown_to_html(text: str) -> str:
                 parts.append("</blockquote>")
                 in_blockquote = False
             content = _html.escape(line)
-            content = re.sub(r'\[@([a-zA-Z][a-zA-Z0-9_:.-]*)\]', r'<code class="citekey">[@\1]</code>', content)
-            content = re.sub(r'@([a-zA-Z][a-zA-Z0-9_:.-]*)', r'<code class="citekey">@\1</code>', content)
+            # Single pass — `[...]` form consumed first, remaining bare citekeys after
+            content = re.sub(
+                r'\[@([a-zA-Z][a-zA-Z0-9_:.-]*)\]|(?<!\w)@([a-zA-Z][a-zA-Z0-9_:.-]*)',
+                lambda m: (
+                    f'<code class="citekey">[@\\1]</code>' if m.group(1)
+                    else f'<code class="citekey">@\\2</code>'
+                ),
+                content,
+            )
             parts.append(f"<p>{content}</p>")
 
     if in_list:

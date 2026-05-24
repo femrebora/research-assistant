@@ -287,19 +287,33 @@ def _log(record: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def _resolve_safe(path: str) -> Path:
+    """Resolve a path against THESIS_ROOT, rejecting traversal escapes.
+
+    Absolute paths are returned as-is (after expanduser + resolve) — only
+    relative paths are sandboxed within THESIS_ROOT.
+    """
+    p = Path(path).expanduser()
+    if p.is_absolute():
+        return p.resolve()
+    p = THESIS_ROOT / p
+    resolved = p.resolve()
+    thesis_resolved = THESIS_ROOT.resolve()
+    if not str(resolved).startswith(str(thesis_resolved) + os.sep) and resolved != thesis_resolved:
+        raise ValueError(
+            f"Path '{path}' resolves outside THESIS_ROOT ({THESIS_ROOT})"
+        )
+    return resolved
+
+
 def read_file(path: str) -> str:
     """Read a file, resolving ~ and relative paths against THESIS_ROOT."""
-    p = Path(path).expanduser()
-    if not p.is_absolute():
-        p = THESIS_ROOT / p
-    return p.read_text(encoding="utf-8")
+    return _resolve_safe(path).read_text(encoding="utf-8")
 
 
 def save_file(path: str, content: str) -> Path:
     """Write content, resolving ~ and relative paths against THESIS_ROOT."""
-    p = Path(path).expanduser()
-    if not p.is_absolute():
-        p = THESIS_ROOT / p
+    p = _resolve_safe(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     return p

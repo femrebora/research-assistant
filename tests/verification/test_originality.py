@@ -61,21 +61,22 @@ def test_check_originality_runs_internal_and_external(tmp_path, monkeypatch):
     )
 
     # Fake the three source helpers
-    def fake_internal(para, threshold):
+    def fake_internal(para, threshold, **kw):
         return [orig.ExternalMatch(
             source="internal", similarity=0.88, title="Internal hit",
             citekey="smith2024", excerpt=para[:80],
         )]
 
-    def fake_openalex(para, threshold):
+    def fake_openalex(para, threshold, **kw):
         return [orig.ExternalMatch(
             source="openalex", similarity=0.81, title="OpenAlex hit",
             doi="10.1/x", excerpt=para[:80],
         )]
 
+    monkeypatch.setattr(orig, "_embed_safe", lambda t: [0.0] * 768)
     monkeypatch.setattr(orig, "_internal_matches", fake_internal)
     monkeypatch.setattr(orig, "_external_matches_openalex", fake_openalex)
-    monkeypatch.setattr(orig, "_external_matches_crossref", lambda p, t: [])
+    monkeypatch.setattr(orig, "_external_matches_crossref", lambda p, t, **kw: [])
 
     report = orig.check_originality(
         str(draft),
@@ -99,9 +100,10 @@ def test_check_originality_skips_short_paragraphs(tmp_path, monkeypatch):
     draft = tmp_path / "draft.md"
     draft.write_text("tiny\n\n" + "long enough paragraph " * 20, encoding="utf-8")
 
-    monkeypatch.setattr(orig, "_internal_matches", lambda p, t: [])
-    monkeypatch.setattr(orig, "_external_matches_openalex", lambda p, t: [])
-    monkeypatch.setattr(orig, "_external_matches_crossref", lambda p, t: [])
+    monkeypatch.setattr(orig, "_embed_safe", lambda t: [0.0] * 768)
+    monkeypatch.setattr(orig, "_internal_matches", lambda p, t, **kw: [])
+    monkeypatch.setattr(orig, "_external_matches_openalex", lambda p, t, **kw: [])
+    monkeypatch.setattr(orig, "_external_matches_crossref", lambda p, t, **kw: [])
 
     report = orig.check_originality(str(draft), min_chars=50)
     assert len(report.paragraphs) == 0   # short paragraph filtered, long one has no matches -> not flagged

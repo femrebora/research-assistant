@@ -52,6 +52,7 @@ class Field:
     options: tuple[str, ...] = ()
     options_key: str | None = None  # e.g. "models" -> MODEL_ALIASES
     required: bool = False
+    repeated: bool = False   # split value on newlines, emit flag per line (match Click multiple=True)
     help: str = ""
     placeholder: str = ""
     min: float | None = None
@@ -263,6 +264,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
                   help="Model that critiques the draft — use a different model for independent perspective."),
             Field("sources", "Source file paths (one per line)", "textarea", flag="--sources",
                   rows=4, placeholder="evidence/ch1/numt.md\nevidence/ch1/lcm.md",
+                  repeated=True,
                   help="Paths to evidence files (relative to THESIS_ROOT), one per line, given to the writer."),
             Field("writer_temp", "Writer temperature", "number", flag="--writer-temp",
                   default=0.3, min=0.0, max=2.0, step=0.1,
@@ -295,6 +297,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
                   default="sonnet", options_key="models",
                   help="Model that verifies the paraphrase preserved the meaning of the original draft."),
             Field("sources", "Source file paths (one per line)", "textarea", flag="--sources", rows=4,
+                  repeated=True,
                   help="Paths to evidence files (relative to THESIS_ROOT), one per line, for the writer stage."),
             Field("skip_writer", "Skip writer (input is already a draft)", "checkbox",
                   flag="--skip-writer",
@@ -362,7 +365,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         name="audit",
         label="Citation audit",
         category="audit",
-        description="Per-source counts, over-cited papers, unused .bib entries, citation density.",
+        description="Per-source counts, over-cited papers, unused bib entries, citation density.",
         fields=(
             Field("draft_file", "Chapter draft", "file_or_text", required=True, rows=14,
                   help="Chapter draft to audit for citation counts, over-cited papers, and unused .bib entries."),
@@ -379,7 +382,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         name="verify",
         label="Citation verification",
         category="audit",
-        description="Check every [@citekey] in your draft resolves to an entry in the .bib. Catches typos and hallucinated keys.",
+        description="Check every [@citekey] in your draft resolves to an entry in your BibTeX file. Catches typos and hallucinated keys.",
         fields=(
             Field("draft_file", "Draft", "file_or_text", required=True, rows=14,
                   help="Chapter draft whose [@citekey] references will be checked against the .bib file."),
@@ -585,8 +588,7 @@ def _argv_for(spec: ToolSpec, form: Mapping[str, Any], scratch_files: list[Path]
         value = _materialize_arg_value(fld, raw, scratch_files)
         if value is None or value == "":
             continue
-        if fld.flag == "--sources":
-            # `--sources` is repeatable; split on lines
+        if fld.repeated:
             for line in str(value).splitlines():
                 line = line.strip()
                 if line:
@@ -613,7 +615,7 @@ def _materialize_arg_value(fld: Field, raw: Any, scratch_files: list[Path]) -> s
         # The actual form keys come from the template (see tools.html).
         text = (raw or "").strip() if isinstance(raw, str) else ""
         path = ""
-        # See _collect_form for how these get combined.
+        # See collect_form for how these get combined.
         if isinstance(raw, dict):
             text = (raw.get("text") or "").strip()
             path = (raw.get("path") or "").strip()

@@ -7,6 +7,7 @@ JSON requests, polite rate-limit, 24-hour cached responses.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 import shelve
@@ -20,8 +21,26 @@ OPENALEX_BASE_URL = "https://api.openalex.org/works"
 CROSSREF_BASE_URL = "https://api.crossref.org/works"
 HTTP_TIMEOUT = 20.0
 
-CACHE_PATH: Path = Path.home() / ".cache" / "research-assistant" / "external_match.shelf"
+_CACHE_DIR = Path(os.environ.get("HOME", str(Path.home()))) / ".cache" / "research-assistant"
+CACHE_PATH: Path = _CACHE_DIR / "external_match.shelf"
 CACHE_TTL_SECONDS: int = 24 * 60 * 60  # 24 hours
+
+_USER_AGENT = "research-assistant/1.0 (https://github.com/femrebora/research-assistant)"
+
+_logger = logging.getLogger("research_assistant.external_match")
+
+# Shared httpx client for connection reuse across paragraphs
+_client: httpx.Client | None = None
+
+
+def _get_client() -> httpx.Client:
+    global _client
+    if _client is None:
+        _client = httpx.Client(
+            timeout=HTTP_TIMEOUT,
+            headers={"User-Agent": _USER_AGENT},
+        )
+    return _client
 
 
 def _cache_key(source: str, query: str) -> str:
@@ -65,15 +84,22 @@ def _first_author(authorships: list[dict[str, Any]]) -> str | None:
 def search_openalex(query: str, *, limit: int = 5) -> list[dict[str, Any]]:
     """Search OpenAlex /works. Returns a list of dicts with title/abstract/year/doi/authors/url.
 
-    Network errors and non-2xx responses are caught and yield an empty list — the
-    caller (originality.py) is tolerant of this.
+    Network errors and non-2xx responses are caught, logged, and yield an empty
+    list — the caller (originality.py) is tolerant of this.
     """
     params = {"search": query, "per-page": str(limit), **_polite_pool_params()}
     try:
-        response = httpx.get(OPENALEX_BASE_URL, params=params, timeout=HTTP_TIMEOUT)
+        response = _get_client().get(OPENALEX_BASE_URL, params=params)
         response.raise_for_status()
         payload = response.json()
-    except Exception:
+    except httpx.HTTPStatusError as exc:
+        _logger.warning("OpenAlex returned HTTP %s for query %r", exc.response.status_code, query[:80])
+        return []
+    except httpx.TimeoutException:
+        _logger.warning("OpenAlex timed out for query %r", query[:80])
+        return []
+    except (httpx.NetworkError, httpx.RequestError, Exception) as exc:
+        _logger.warning("OpenAlex request failed for query %r: %s", query[:80], exc)
         return []
 
     out: list[dict[str, Any]] = []
@@ -120,17 +146,27 @@ def _crossref_year(issued: dict[str, Any] | None) -> int | None:
 
 
 def search_crossref(query: str, *, limit: int = 5) -> list[dict[str, Any]]:
-    """Search Crossref /works. Same return shape as search_openalex."""
+    """Search Crossref /works. Same return shape as search_openalex.
+
+    Network errors are caught, logged, and yield an empty list.
+    """
     params = {
         "query.bibliographic": query,
         "rows": str(limit),
         "select": "DOI,title,abstract,issued,author,URL",
     }
     try:
-        response = httpx.get(CROSSREF_BASE_URL, params=params, timeout=HTTP_TIMEOUT)
+        response = _get_client().get(CROSSREF_BASE_URL, params=params)
         response.raise_for_status()
         payload = response.json()
-    except Exception:
+    except httpx.HTTPStatusError as exc:
+        _logger.warning("Crossref returned HTTP %s for query %r", exc.response.status_code, query[:80])
+        return []
+    except httpx.TimeoutException:
+        _logger.warning("Crossref timed out for query %r", query[:80])
+        return []
+    except (httpx.NetworkError, httpx.RequestError, Exception) as exc:
+        _logger.warning("Crossref request failed for query %r: %s", query[:80], exc)
         return []
 
     out: list[dict[str, Any]] = []
@@ -159,8 +195,8 @@ def cached_search(source: str, query: str, *, limit: int = 5) -> list[dict[str, 
     """Run `_SEARCHERS[source](query, limit=limit)` with on-disk caching.
 
     Cache entries are pickled `{ts, results}` dicts. Entries older than
-    CACHE_TTL_SECONDS are refetched. Cache failures are non-fatal — we fall
-    back to a live request.
+    CACHE_TTL_SECONDS are refetched. Cache failures are logged and non-fatal —
+    we fall back to a live request.
     """
     if source not in _SEARCHERS:
         raise ValueError(f"Unknown source '{source}'. Available: {list(_SEARCHERS)}")
@@ -168,20 +204,21 @@ def cached_search(source: str, query: str, *, limit: int = 5) -> list[dict[str, 
     key = _cache_key(source, f"{query}::{limit}")
     CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
+    # Single shelve open for read + optional write
     try:
         with shelve.open(str(CACHE_PATH)) as cache:
             entry = cache.get(key)
             if entry and (time.time() - entry["ts"] < CACHE_TTL_SECONDS):
                 return entry["results"]
-    except Exception:
-        pass  # cache miss / corruption — fall through to live fetch
+    except (shelve.error, OSError, EOFError) as exc:
+        _logger.warning("Cache read failed for %s/%r: %s", source, query[:80], exc)
 
     results = _SEARCHERS[source](query, limit=limit)
 
     try:
         with shelve.open(str(CACHE_PATH)) as cache:
             cache[key] = {"ts": time.time(), "results": results}
-    except Exception:
-        pass  # write failure is non-fatal
+    except (shelve.error, OSError) as exc:
+        _logger.warning("Cache write failed for %s/%r: %s", source, query[:80], exc)
 
     return results

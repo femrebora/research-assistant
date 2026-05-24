@@ -1,10 +1,6 @@
 """Unit tests for verification.external_match: OpenAlex + Crossref clients."""
 from __future__ import annotations
 
-import time
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 
 OPENALEX_FIXTURE = {
@@ -36,6 +32,20 @@ CROSSREF_FIXTURE = {
 }
 
 
+def _make_client(json_fixture):
+    """Return a mock httpx.Client whose .get() returns a response for *json_fixture*."""
+    resp = type("R", (), {"json": lambda self: json_fixture, "raise_for_status": lambda self: None})()
+    return type("C", (), {"get": lambda s, url, params: resp})()
+
+
+@pytest.fixture(autouse=True)
+def _reset_em_client(monkeypatch):
+    """Ensure _client starts fresh for every test — no state leaks."""
+    from research_assistant.verification import external_match as em
+
+    monkeypatch.setattr(em, "_client", None)
+
+
 @pytest.mark.unit
 def test_cache_key_is_stable_and_source_aware():
     from research_assistant.verification.external_match import _cache_key
@@ -52,12 +62,11 @@ def test_cache_key_is_stable_and_source_aware():
 
 
 @pytest.mark.unit
-def test_search_openalex_returns_parsed_matches():
-    from research_assistant.verification.external_match import search_openalex
+def test_search_openalex_returns_parsed_matches(monkeypatch):
+    from research_assistant.verification import external_match as em
 
-    fake_response = type("R", (), {"json": lambda self: OPENALEX_FIXTURE, "raise_for_status": lambda self: None})()
-    with patch("research_assistant.verification.external_match.httpx.get", return_value=fake_response):
-        results = search_openalex("NUMT contamination in clinical mtDNA", limit=5)
+    monkeypatch.setattr(em, "_client", _make_client(OPENALEX_FIXTURE))
+    results = em.search_openalex("NUMT contamination in clinical mtDNA", limit=5)
 
     assert len(results) == 1
     m = results[0]
@@ -70,12 +79,11 @@ def test_search_openalex_returns_parsed_matches():
 
 
 @pytest.mark.unit
-def test_search_crossref_returns_parsed_matches():
-    from research_assistant.verification.external_match import search_crossref
+def test_search_crossref_returns_parsed_matches(monkeypatch):
+    from research_assistant.verification import external_match as em
 
-    fake = type("R", (), {"json": lambda self: CROSSREF_FIXTURE, "raise_for_status": lambda self: None})()
-    with patch("research_assistant.verification.external_match.httpx.get", return_value=fake):
-        results = search_crossref("NUMT interfere variant calling", limit=5)
+    monkeypatch.setattr(em, "_client", _make_client(CROSSREF_FIXTURE))
+    results = em.search_crossref("NUMT interfere variant calling", limit=5)
 
     assert len(results) == 1
     m = results[0]
@@ -96,11 +104,11 @@ def test_cached_search_hits_cache_on_second_call(tmp_path, monkeypatch):
 
     call_count = {"n": 0}
 
-    def fake_get(url, params=None, timeout=None):
+    def fake_get(self, url, params):
         call_count["n"] += 1
         return type("R", (), {"json": lambda self: OPENALEX_FIXTURE, "raise_for_status": lambda self: None})()
 
-    monkeypatch.setattr(em.httpx, "get", fake_get)
+    monkeypatch.setattr(em, "_client", type("C", (), {"get": fake_get})())
 
     r1 = em.cached_search("openalex", "NUMT contamination", limit=5)
     r2 = em.cached_search("openalex", "NUMT contamination", limit=5)
@@ -118,11 +126,11 @@ def test_cache_expires_after_ttl(tmp_path, monkeypatch):
 
     call_count = {"n": 0}
 
-    def fake_get(*a, **kw):
+    def fake_get(self, *a, **kw):
         call_count["n"] += 1
         return type("R", (), {"json": lambda self: OPENALEX_FIXTURE, "raise_for_status": lambda self: None})()
 
-    monkeypatch.setattr(em.httpx, "get", fake_get)
+    monkeypatch.setattr(em, "_client", type("C", (), {"get": fake_get})())
 
     em.cached_search("openalex", "NUMT", limit=5)
     em.cached_search("openalex", "NUMT", limit=5)

@@ -10,20 +10,12 @@ import html
 
 import pytest
 
-from research_assistant.web.app import app
 from research_assistant.web.tool_runner import TOOL_SPECS
-
-
-@pytest.fixture
-def client():
-    app.config["TESTING"] = True
-    with app.test_client() as c:
-        yield c
 
 
 @pytest.mark.unit
 def test_originality_tool_is_registered(client):
-    from research_assistant.web.tool_runner import _MODULE_BY_NAME, TOOL_SPECS
+    from research_assistant.web.tool_runner import _MODULE_BY_NAME
 
     names = {s.name for s in TOOL_SPECS}
     assert "originality" in names, "originality not registered in TOOL_SPECS"
