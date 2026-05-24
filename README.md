@@ -72,6 +72,7 @@ research-assistant/
 | `ra-audit`         | Citation density, over-cites, unused .bib entries       |
 | `ra-verify`        | `[@citekey]` resolution against your .bib               |
 | `ra-claim-verify`  | Per-claim SUPPORTED / PARTIAL / UNSUPPORTED / CONTRADICTED |
+| `ra-originality`   | Originality check (internal + OpenAlex / Crossref)      |
 | `ra-disclose`      | Venue-ready AI-usage disclosure from your call logs     |
 
 ### Web / desktop UI
@@ -368,6 +369,25 @@ ra-claim-verify drafts/chapter1.md --limit 10  # dry-run on first 10 claims
 **Exit code is non-zero** if any claim is `UNSUPPORTED` or `CONTRADICTED`, so the script is usable as a pre-submission / CI gate.
 
 Heuristic for claim detection: sentences containing a `[@citekey]` or factual signal words (*shows, demonstrates, reports, found, established, significantly, associated with, …*) are treated as claims. Plain narrative sentences are skipped.
+
+#### originality.py — Originality / plagiarism check
+
+```bash
+# Default: all three sources, sensible thresholds
+ra-originality drafts/ch1.md
+
+# Internal-only (faster, no network)
+ra-originality drafts/ch1.md --sources internal
+
+# Stricter thresholds
+ra-originality drafts/ch1.md --internal-threshold 0.80 --external-threshold 0.75 --json
+```
+
+Not a true plagiarism detector -- it flags paragraphs that look too close to your
+own indexed library or to published academic abstracts (via OpenAlex and Crossref).
+Results require human review.
+
+Set `OPENALEX_EMAIL=you@example.com` in `.env` to use OpenAlex's polite request pool.
 
 #### pipeline.py — Full orchestrator
 
