@@ -39,6 +39,7 @@
                            placeholder="e.g. drafts/chapter1.md (relative to THESIS_ROOT)"
                            class="flex-1 px-3 py-1.5 border border-slate-300 rounded-md text-xs font-mono">
                 </div>
+                {% if fld.help %}<p class="text-xs text-slate-500 mt-1">{{ fld.help }}</p>{% endif %}
 
             {% elif fld.kind == "textarea" %}
                 <label class="block text-sm font-medium text-slate-700 mb-1">{{ fld.label }}{% if fld.required %} <span class="text-rose-500">*</span>{% endif %}</label>
@@ -46,6 +47,7 @@
                           {% if fld.required %}required{% endif %}
                           placeholder="{{ fld.placeholder }}"
                           class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"></textarea>
+                {% if fld.help %}<p class="text-xs text-slate-500 mt-1">{{ fld.help }}</p>{% endif %}
 
             {% elif fld.kind == "select" %}
                 <label class="block text-sm font-medium text-slate-700 mb-1">{{ fld.label }}</label>
@@ -55,6 +57,7 @@
                     <option value="{{ opt }}" {% if opt == fld.default|string %}selected{% endif %}>{{ opt or "(none)" }}</option>
                     {% endfor %}
                 </select>
+                {% if fld.help %}<p class="text-xs text-slate-500 mt-1">{{ fld.help }}</p>{% endif %}
 
             {% elif fld.kind == "number" %}
                 <label class="block text-sm font-medium text-slate-700 mb-1">{{ fld.label }}</label>
@@ -64,6 +67,7 @@
                        {% if fld.max is not none %}max="{{ fld.max }}"{% endif %}
                        {% if fld.step is not none %}step="{{ fld.step }}"{% endif %}
                        class="px-3 py-2 border border-slate-300 rounded-md text-sm w-32">
+                {% if fld.help %}<p class="text-xs text-slate-500 mt-1">{{ fld.help }}</p>{% endif %}
 
             {% else %} {# text #}
                 <label class="block text-sm font-medium text-slate-700 mb-1">{{ fld.label }}{% if fld.required %} <span class="text-rose-500">*</span>{% endif %}</label>
@@ -72,6 +76,7 @@
                        {% if fld.default %}value="{{ fld.default }}"{% endif %}
                        placeholder="{{ fld.placeholder }}"
                        class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                {% if fld.help %}<p class="text-xs text-slate-500 mt-1">{{ fld.help }}</p>{% endif %}
             {% endif %}
         </div>
         {% endfor %}
