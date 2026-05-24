@@ -25,6 +25,18 @@
                 </label>
                 {% endfor %}
             </div>
+            <details class="text-xs text-slate-500 cursor-pointer select-none mt-2">
+                <summary class="text-slate-600 hover:text-slate-800">When should I pick which models?</summary>
+                <p class="mt-1 leading-relaxed">
+                    Pick 2--4 models from different families to surface disagreements.
+                    <strong>Claude</strong> and <strong>GPT</strong> are strong on prose;
+                    <strong>Gemini</strong> is strong on multi-document synthesis;
+                    <strong>DeepSeek</strong> is cheap and good at structured tasks;
+                    <strong>Sonnet/Haiku/Flash/gpt-mini</strong> are faster + cheaper variants for high-volume use.
+                    With <em>--rag</em> on, all models see the same retrieved context -- so disagreement is about
+                    interpretation, not access.
+                </p>
+            </details>
         </div>
 
         <div class="flex flex-wrap items-center gap-4">
