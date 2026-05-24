@@ -1,8 +1,9 @@
 # LangGraph Agentic Pipeline + Unified Web Workbench — Design
 
 **Date:** 2026-05-24
-**Status:** Approved (pending user spec review)
+**Status:** Approved (revised after UI-completeness audit)
 **Author:** Brainstorming session with `superpowers:brainstorming`
+**Revision:** R2 — added CLIChatModel adapter, /logs viewer, /files browser + editor, /bib viewer, /settings provider-ping, global error overlay
 
 ## 1. Problem & Goal
 
@@ -28,7 +29,8 @@ research_assistant/
 │   ├── __init__.py                ← exports: build_writing_graph, run_writing_pipeline, RunState
 │   ├── state.py                   ← TypedDict RunState
 │   ├── schemas.py                 ← Pydantic: Critique, Issue, RetrievalReport, VerifierReport, StepRecord
-│   ├── models.py                  ← ChatLiteLLM factory; bridges MODELS dict → LangChain
+│   ├── models.py                  ← Factory: routes to ChatLiteLLM (API) or CLIChatModel (subprocess) based on MODELS value
+│   ├── cli_chat_model.py          ← NEW: LangChain BaseChatModel subclass wrapping common._ask_via_cli — keeps the 4 CLI aliases (claude-cli/gemini-cli/codex-cli/ollama-cli) working in the graph
 │   ├── policies.py                ← PipelineConfig + iteration knobs
 │   ├── observability.py           ← @traced decorator, JSONL writer, SSE event bus
 │   ├── nodes/
@@ -46,22 +48,33 @@ research_assistant/
 │       └── writing_pipeline.py    ← StateGraph wiring + conditional edges
 ├── pipeline.py                    ← REFACTORED: ~80 lines; CLI front door, calls agents.run_writing_pipeline
 └── web/
-    ├── app.py                     ← + routes: /workbench, /workbench/run, /workbench/stream/<id>, /runs, /runs/<id>, /usage, /settings
+    ├── app.py                     ← + routes: /workbench, /workbench/run, /workbench/stream/<id>, /runs, /runs/<id>, /usage, /settings, /logs, /files, /files/bib
     ├── workbench.py               ← NEW: SSE bridge between graph and HTTP
     ├── runs_store.py              ← NEW: JSONL writer + SQLite index (dual storage)
     ├── usage_store.py             ← NEW: aggregations over ~/thesis/logs/*.jsonl
-    ├── settings_store.py          ← NEW: user prefs in ~/.config/research-assistant/settings.json
+    ├── settings_store.py          ← NEW: user prefs + provider-ping health check
+    ├── logs_view.py               ← NEW: paginated/filtered reader for ~/thesis/logs/*.jsonl
+    ├── files_browser.py           ← NEW: read THESIS_ROOT tree, safe-path resolution, file ops
+    ├── bib_view.py                ← NEW: parse bib/thesis.bib + cross-reference with latest run citations
+    ├── errors.py                  ← NEW: ErrorReport dataclass + helpers for the global error overlay
     ├── templates/
-    │   ├── base.html              ← + nav links + dark theme toggle
+    │   ├── base.html              ← + nav links + dark theme toggle + global error overlay partial
+    │   ├── _error_overlay.html    ← NEW (Jinja partial included on every page)
     │   ├── workbench.html         ← NEW
     │   ├── workbench_event.html   ← NEW (HTMX SSE fragment per node event)
     │   ├── runs.html              ← NEW
     │   ├── run_detail.html        ← NEW
     │   ├── usage.html             ← NEW
+    │   ├── logs.html              ← NEW
+    │   ├── files.html             ← NEW (tree + file actions)
+    │   ├── file_detail.html       ← NEW (read + inline CodeMirror editor)
+    │   ├── bib.html               ← NEW
     │   └── settings.html          ← NEW
     └── static/
-        ├── style.css              ← + dark-mode workbench styles
-        └── workbench.js           ← ~50 lines: SSE event handling, graph state updates
+        ├── style.css              ← + dark-mode workbench styles + error-overlay styles
+        ├── workbench.js           ← ~50 lines: SSE event handling, graph state updates
+        ├── editor.js              ← ~30 lines: CodeMirror init from CDN, save button hook
+        └── error_overlay.js       ← ~20 lines: slide-in panel, copy-as-bug-report
 ```
 
 ### Boundary rules
@@ -77,9 +90,10 @@ research_assistant/
 - `langchain-core>=0.3,<0.4`
 - `langchain-litellm>=0.1` — preserves the existing `MODELS` registry and litellm cost logging
 - `tenacity>=8.0` — retry policy for LLM calls
-- `pydantic>=2.0` — already implied by langchain ecosystem
+- `pydantic>=2.0` — already implied by langchain ecosystem (2.12 already installed)
+- `bibtexparser>=2.0` — for `/files/bib` viewer (pure Python, no compile)
 
-No new runtime dep for SQLite (stdlib `sqlite3`).
+No new runtime dep for SQLite (stdlib `sqlite3`) or CodeMirror (loaded from CDN at runtime).
 
 ## 3. RunState & Structured Outputs
 
@@ -274,6 +288,20 @@ def get_chat_model(role_alias: str, *, temperature: float = 0.3) -> BaseChatMode
 
 This preserves the existing model registry and the per-call cost logging in `common.py`. No fragmentation.
 
+### `agents/cli_chat_model.py` — covering the CLI-providers gap
+
+The `MODELS` dict contains 4 aliases whose values start with `cli:` (`claude-cli`, `gemini-cli`, `codex-cli`, `ollama-cli`). These shell out to a subprocess instead of calling an API, so `ChatLiteLLM` cannot drive them. Without an adapter they would silently disappear from Workbench dropdowns.
+
+`CLIChatModel` is a `langchain_core.language_models.BaseChatModel` subclass that:
+
+1. Reads the `cli:<command>` template from `MODELS[alias]`.
+2. Joins LangChain `BaseMessage` list into the same `[System]/[User]` block format `common._ask_via_cli` already produces.
+3. Calls `subprocess.run(...)` with the same timeout/error semantics.
+4. Returns a `ChatResult` with the stdout text. Token counts are `None`; cost is `$0.0` (subscription billing happens elsewhere — matches current behavior).
+5. Reuses the JSONL logging in `common._log` so disclosure logs stay one source of truth.
+
+`agents/models.py::get_chat_model(alias)` inspects `MODELS[alias]`: if it starts with `cli:`, return `CLIChatModel`; otherwise return `ChatLiteLLM`. All 14 aliases work identically inside graph nodes and tool-using writer flows. Structured-output calls (`with_structured_output(Critique)`) on a CLI model fall back to a JSON-coerce retry since CLIs don't expose function-calling — if both attempts fail, the critic node returns a `Critique(verdict="REVISE", issues=[], summary="cli model unable to produce structured output")` and the graph continues.
+
 ### Observability
 
 ```python
@@ -323,6 +351,15 @@ Stack stays Flask + HTMX + Tailwind. Server-Sent Events for streaming (HTMX `hx-
 | `/runs/<run_id>/fork` | POST | Clone settings, open in workbench |
 | `/usage` | GET | Cost dashboard from `~/thesis/logs/*.jsonl` |
 | `/settings` | GET/POST | Model presets, default iteration knobs, API key health |
+| `/settings/ping` | POST | Pings every configured provider with a tiny call, returns per-provider OK/fail with actual error message |
+| `/logs` | GET | Paginated/filterable view of `~/thesis/logs/*.jsonl` (by date / model / status / search). Source of truth for "what did the model actually do" debugging. |
+| `/logs/<date>/<n>` | GET | Single call detail: full prompt, full response, system message, tokens, cost. JSON or rendered. |
+| `/files` | GET | Read-only browser of THESIS_ROOT. Sidebar tree (outputs/, outlines/, evidence/, bib/, runs/, sessions/). Click a file → detail. |
+| `/files/view/<path>` | GET | File viewer with syntax highlighting + "Open in editor" + "Use as draft in Workbench" actions. Path-traversal protected against THESIS_ROOT. |
+| `/files/edit/<path>` | GET | Same path opened in CodeMirror (CDN, single script). |
+| `/files/save/<path>` | POST | Save edited content. Returns updated file detail. |
+| `/files/bib` | GET | Special viewer for `bib/thesis.bib`: parsed entries table + which are used / unused in the latest run (cross-referenced via `VerifierReport.resolved`). |
+| `/errors/report` | POST | Endpoint the global error overlay POSTs to when user clicks "copy as bug report" — returns a sanitized text blob (argv, exit code, stderr tail, env summary minus secrets). |
 
 ### `/workbench` layout
 
@@ -377,9 +414,78 @@ Form posts to `/workbench/run` → backend creates a `run_id`, starts the LangGr
 
 - Saved model role presets ("default", "cheap", "premium") — JSON in `~/.config/research-assistant/settings.json`
 - Default iteration knobs (max_iters, cost_cap)
-- API-key health check — POSTs to each configured provider with a tiny ping, reports OK / fail
+- API-key health: **"Ping all providers" button** → POST `/settings/ping` makes a 1-token call to each API model (and `--version` for each CLI provider). Per-provider result: ✅ OK / ❌ with the real error string. No secrets in the displayed output.
 - Index status (last indexed, chunk count) — already available, just surfaced here
 - Theme preference (light/dark)
+
+## 6.5 UI Completeness Pages — Debug & File Control
+
+Three additional pages and one global component close the "can I control and debug everything via UI" gap.
+
+### `/logs` — JSONL call log viewer
+
+Reads `~/thesis/logs/*.jsonl`. Every `ask_model` and `_ask_via_cli` call (from anywhere in the codebase — RAG, pipeline, tools, agents) is already logged here. The viewer surfaces them:
+
+- Filter by date range, model alias, via=api|cli, has-error.
+- Search across prompt + response text (substring match — full-text search is overkill for this scale).
+- Each row shows: timestamp, model, tokens in/out, cost, first 80 chars of prompt.
+- Click a row → `/logs/<date>/<n>` shows the full prompt, system, response side-by-side. "Replay in Workbench" sends the prompt to /workbench with same model preselected.
+- This is the ground truth for any "why did the model say X?" debugging.
+
+### `/files` — THESIS_ROOT browser
+
+`THESIS_ROOT` (default `~/thesis/`) is where every tool saves output (`outlines/`, `evidence/`, `runs/`, `sessions/`, `bib/`, `chroma_db/`). Today users browse it in their file manager. The browser surfaces:
+
+- Sidebar tree of top-level dirs under THESIS_ROOT, with file counts and last-modified.
+- Click a dir → file list with size, modified, preview snippet.
+- Click a file → `/files/view/<path>` renders content with syntax highlighting (markdown gets rendered, JSONL gets pretty-printed line-by-line, .bib gets parsed table view).
+- Actions per file: **Open in editor** (loads CodeMirror), **Open in Workbench as draft** (POSTs to `/workbench` with file content as the `question` field's seed), **Download**.
+- Path-traversal protected: every path is resolved and verified to start with `THESIS_ROOT.resolve()`; same pattern as `_safe_session_path` in current `app.py`.
+
+### `/files/edit/<path>` — Inline editor
+
+CodeMirror 6 loaded from CDN as a single `<script type="module">` tag — no build step, no npm. ~30 lines of JS in `editor.js`. Supports markdown and BibTeX modes. Save → POST `/files/save/<path>` → updated file detail rendered. After saving an outline or draft, an "Open in Workbench" button is one click away.
+
+### `/files/bib` — Bibliography viewer
+
+Special-case viewer for `bib/thesis.bib`:
+
+- Parse entries via `bibtexparser>=2.0` (small dep, pure Python, no compile).
+- Table: citekey, type, title, year, authors, **used in latest run?** (cross-referenced via `runs.db` → latest run's `VerifierReport.resolved` list).
+- Filter: unused entries, entries from a date range.
+- Edit single entry in modal (writes back via the same `/files/save` endpoint).
+
+### Global error overlay (`_error_overlay.html`)
+
+A single Jinja partial included by `base.html` and rendered on every page. JS in `error_overlay.js` listens for HTMX response events:
+
+- If response status is 4xx/5xx OR response body contains a `<div data-error>...</div>` element, the overlay slides in from the right.
+- Shows: short message, expandable details (argv, exit code, stderr tail, traceback if present).
+- **Copy as bug report** button → POST `/errors/report` returns a redacted text blob (no API keys, no .env contents) the user can paste into a bug tracker.
+- Dismiss = click outside or Esc.
+
+Backend hook: every tool route and SSE event uses a small `errors.format_error(exc, *, argv, route)` helper to produce consistent error markup. Existing `/tools/*/run` adds the data-error attribute when `ToolResult.error` is set.
+
+Result: every failure anywhere in the UI surfaces a structured, copyable, sanitized error — not a stderr tail in a `<pre>` block.
+
+## 6.6 What "control everything via UI" means after this work
+
+| Capability | Today | After this design |
+|---|---|---|
+| Run any of the 15 CLI tools | ✅ /tools/* | ✅ kept |
+| Run full agentic pipeline live with streaming | ❌ | ✅ /workbench |
+| Browse past runs, diff iterations, fork | ⚠️ sessions only | ✅ /runs |
+| See per-provider cost/usage over time | ❌ | ✅ /usage |
+| Edit API keys / model presets | ❌ | ✅ /settings |
+| Verify each provider is reachable (ping-all) | ❌ | ✅ /settings/ping |
+| View raw call logs (debug "what did the model say?") | ❌ | ✅ /logs |
+| Replay any past call in Workbench | ❌ | ✅ /logs row action |
+| Browse THESIS_ROOT outputs in UI | ❌ | ✅ /files |
+| Edit a saved outline/draft in browser | ❌ | ✅ /files/edit/<path> |
+| Use a saved file as Workbench seed | ❌ | ✅ /files action |
+| View .bib entries + unused entries | ❌ | ✅ /files/bib |
+| Get a copyable bug report when anything fails | ❌ | ✅ global error overlay |
+| Use the 4 CLI-based model providers in agents | n/a | ✅ via CLIChatModel |
 
 ## 7. Storage — Dual JSONL + SQLite
 
@@ -461,20 +567,36 @@ CREATE INDEX idx_runs_status  ON runs(status);
 | Runs store | `tests/web/test_runs_store.py` | JSONL written, SQLite indexed, reindex rebuilds DB from JSONL |
 | Usage aggregation | `tests/web/test_usage_store.py` | Aggregation correct for synthetic JSONL |
 | Settings | `tests/web/test_settings.py` | Read/write round-trip; API-key ping mocked |
+| Provider ping | `tests/web/test_settings_ping.py` | Each provider class mocked; ping returns OK with valid creds, structured fail otherwise; no secret leakage in error string |
+| Logs viewer | `tests/web/test_logs_view.py` | Paginate synthetic JSONL; filter by date/model/error; single-call detail renders escaped HTML |
+| Files browser | `tests/web/test_files_browser.py` | Path-traversal blocked (`../`, absolute paths, symlinks outside THESIS_ROOT); tree listing; save round-trip |
+| Bib viewer | `tests/web/test_bib_view.py` | Parse fixture .bib; cross-reference against synthetic `runs.db`; unused-entry filter correct |
+| Error overlay | `tests/web/test_errors.py` | `format_error` redacts env vars matching `*_API_KEY` and `*_TOKEN`; bug-report blob has no secrets |
+| CLIChatModel | `tests/agents/test_cli_chat_model.py` | subprocess mocked; message → CLI prompt formatting matches `_ask_via_cli`; timeout/failure paths covered; structured-output fallback returns valid REVISE critique |
 | Legacy CLI | `tests/test_pipeline_legacy.py` | `ra-pipeline ... --legacy` produces output byte-identical to pre-refactor for canned inputs |
 
 **Coverage target:** 80%+ on `agents/`, 70%+ on new `web/` code.
 
 ## 10. Build Sequence
 
-1. **Foundation** — `agents/` package: state, schemas, models, policies, observability, all 5 nodes, graph wiring. Unit tests per node + graph.
+1. **Foundation** — `agents/` package: state, schemas, policies, observability, **models.py + cli_chat_model.py**, all 5 nodes, graph wiring. Unit tests per node + graph + CLIChatModel.
 2. **CLI refactor** — `pipeline.py` becomes thin wrapper; add new flags; `--legacy` test passes.
-3. **Workbench UI** — `/workbench` page + SSE bridge + `runs_store.py` (JSONL write only). Hand-test end-to-end.
+3. **Workbench UI + error overlay** — `/workbench` page + SSE bridge + `runs_store.py` (JSONL write). Global error overlay component shipped here so every later page benefits.
 4. **Runs UI** — SQLite index + `/runs` list + `/runs/<id>` detail + fork.
-5. **Usage + Settings** — dashboards + presets + API health check.
-6. **Test hardening + docs** — fill coverage gaps, update README sections.
+5. **Usage + Settings (with provider-ping)** — dashboards + presets + `/settings/ping`.
+6. **Logs viewer** — `/logs` paginated/filtered reader + single-call detail + "Replay in Workbench" action.
+7. **Files browser + bib viewer** — `/files`, `/files/view`, `/files/edit` (CodeMirror), `/files/save`, `/files/bib`. Adds `bibtexparser>=2.0` dep.
+8. **Test hardening + docs** — fill coverage gaps, update README, add screenshots.
 
-Each step is independently shippable. After step 2 the CLI is already improved; after step 3 the Workbench is usable; after step 4 history works; after steps 5-6 the experience is complete.
+Each step is independently shippable:
+- After step 2 the CLI is already improved (all old flags still work).
+- After step 3 the Workbench is usable for daily writing.
+- After step 4 history works.
+- After step 5 you can manage settings and see costs without touching .env.
+- After step 6 you can debug "what did model X say last Tuesday" without leaving the browser.
+- After step 7 you never need to leave the browser for thesis work.
+
+Total expected delta: ~5500-6000 lines of code (incl. tests). Existing CLI tools and `/tools/*` page untouched.
 
 ## 11. Risks & Mitigations
 
@@ -486,3 +608,9 @@ Each step is independently shippable. After step 2 the CLI is already improved; 
 | SSE connection drops mid-run | Run continues server-side; client reconnects with `Last-Event-ID` and replays from JSONL. Standard SSE pattern. |
 | SQLite write contention from concurrent runs | Single writer thread per process; web app serializes `run_end` writes. Acceptable for a local desktop tool. |
 | Dark theme breaks existing pages | Theme toggle scoped per-page initially; existing pages opt-in by adding a class. |
+| CLI-providers stop working in graph | `CLIChatModel` adapter ships in step 1 of build sequence; covered by `tests/agents/test_cli_chat_model.py` with subprocess mocking. |
+| CLI provider can't produce structured output for critic | Critic node catches the structured-output failure, returns a hardcoded `Critique(verdict="REVISE", summary="...")` so the graph still progresses rather than crashing. User sees a warning in the UI run trace. |
+| Files browser exposes paths outside THESIS_ROOT | Every path is `Path.resolve()`-checked against `THESIS_ROOT.resolve()` before any read/write — same pattern already used by `_safe_session_path`. Symlinks pointing outside are rejected. Test: `test_files_browser.py::test_path_traversal_blocked`. |
+| Inline editor saves bad content over a draft | All `/files/save/<path>` writes go to a `<path>.tmp` first, then atomic `os.replace()`. On any exception the tmp is unlinked and the original is intact. |
+| Error overlay leaks API keys in "copy as bug report" | `errors.format_error` runs the blob through a regex redactor for `(SK-|sk-ant|AIza|...)` patterns AND env-var keys matching `*_API_KEY|*_TOKEN|*_SECRET`. Test: `test_errors.py::test_no_secret_leakage` with a synthetic env. |
+| Logs viewer slow at large JSONL volumes | Stream-read JSONL with offset/limit; never load full file. Cap displayed rows at 500/page. For thesis-scale this is fine (months of logs are tens of MB at most). |
