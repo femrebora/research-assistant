@@ -35,11 +35,62 @@ A CLI toolkit + web UI for master's and PhD thesis research. Index your Zotero P
 | `audit.py` | **Citation audit** — per-source counts, over-cited papers, unused .bib entries, density |
 | `verify.py` | **Citation verification** — check all `[@citekey]` placeholders resolve in your `.bib` |
 
+### PaperForge — Multi-Agent Paper Generation
+
+PaperForge generates complete academic papers from a codebase or a research topic using 7 specialized AI agents.
+
+| Script | Purpose |
+|--------|---------|
+| `run_agentic.py` | **Code → Paper** — generate an academic paper from a codebase. Analyzes code, writes draft, assesses quality, rewrites, checks plagiarism, generates figures. |
+| `run_review.py` | **Topic → Review Article** — generate a literature review autonomously. Searches OpenAlex + DuckDuckGo, synthesizes research, writes a proper review article. |
+| `quick_ai_score.py` | **AI Text Detection** — 7 mechanical checks (em dashes, sentence length, comma density, burstiness, formulaic phrases, paragraph openings, roadmap sentences) with 0-10 scoring. No LLM calls. |
+
+**Pipeline Architecture:**
+
+```
+Codebase → Code Analyst (Gemini) → Writer (DeepSeek) → Assessor (Claude)
+              ↓                         ↓                    ↓
+        Technical report          Complete draft      Section scores
+                                                              ↓
+                                              Rewriter (Claude) ←──┘
+                                              (loops ≤3× until score ≥7)
+                                                              ↓
+                                              Plagiarism Check (report-only)
+                                                              ↓
+                                              Figure Gen (Gemini) → Supervisor (Claude)
+```
+
+For review articles, `Code Analyst` is replaced by `Literature Researcher` which searches:
+- **OpenAlex** — academic papers (free, no API key)
+- **DuckDuckGo** — companies, market data, clinical news
+
+**Agents:**
+
+| Agent | Model | Role |
+|-------|-------|------|
+| Code Analyst | Gemini 2.5 Pro | Scans codebase, produces structured technical report |
+| Literature Researcher | Claude Opus 4.7 | Searches web + academic databases, synthesizes research |
+| Writer | DeepSeek | Generates complete paper from technical report |
+| Assessor | Claude Opus 4.7 | Scores each section 1-10 for quality + AI-sounding patterns |
+| Rewriter | Claude Opus 4.7 | Revises sections scoring <7, with rewrite loop (capped at 3) |
+| Plagiarism Check | DeepSeek | Checks originality and AI-likelihood (report-only) |
+| Figure Gen | Gemini 2.5 Pro | Generates figures from technical data |
+| Figure Supervisor | Claude Opus 4.7 | Reviews figures for publication quality |
+
+**Anti-AI prose safeguards:**
+- Prompt-level: em dash ban, sentence length caps (35 words), comma limits
+- Post-processing: `agentic/text_cleanup.py` mechanically removes remaining em dashes, splits overlong sentences
+- Cached AI tells: `ai_tells.json` with overused words, formulaic structures
+- `quick_ai_score.py`: 0-10 mechanical AI-text scoring
+
+**Benchmark data:** `agentic/benchmark_parser.py` auto-discovers JSON/CSV/TSV benchmarks from the target codebase, injecting real numbers into the Writer prompt to prevent data fabrication.
+
 ### Web UI
 
 | Script | Purpose |
 |--------|---------|
 | `app.py` | **Web UI** — Flask web interface for the research assistant |
+| `agentic/web_server.py` | **PaperForge Web UI** — Flask blueprint with SSE progress streaming, form, and paper download |
 
 ## Quick Start
 
@@ -68,9 +119,9 @@ cp env.example .env
 Required variables:
 ```bash
 # At least one model provider
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=sk-ant-...     # or ANTHROPIC_AUTH_TOKEN (for Claude CLI)
 GEMINI_API_KEY=...
-DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_API_KEY=sk-...          # or ANTHROPIC_AUTH_TOKEN (fallback)
 OPENAI_API_KEY=sk-...
 
 # Zotero integration (for researcher.py and zot.py)
@@ -143,6 +194,41 @@ ZOTERO_STORAGE=/home/you/Zotero/storage
 ./compare.py "..." --models claude,gemini,gpt --save my_comparison
 ```
 
+### PaperForge — Paper generation
+
+```bash
+# One-time setup: refresh knowledge caches
+./run_agentic.py --refresh-style --domain bioinformatics
+./run_agentic.py --refresh-artifacts
+
+# Generate a paper from a codebase
+./run_agentic.py /path/to/your/project \
+    --summary "A pipeline for detecting transient binding pockets from MD simulations" \
+    --output ~/thesis/output/my-paper
+
+# Generate a review article from a topic (autonomous web research!)
+./run_review.py --topic "CRISPR-Based Therapeutics: Delivery Methods and Clinical Trials"
+
+# Check a paper for AI-generated text patterns
+./quick_ai_score.py paper.md --json
+./quick_ai_score.py paper.md --ai-tells ~/thesis/cache/ai_tells.json
+
+# Launch Streamlit dashboard
+./run_agentic.py --ui
+```
+
+**Review article mode** does everything autonomously:
+1. Searches OpenAlex for academic papers (free, no API key)
+2. Searches DuckDuckGo for companies, market data, clinical news
+3. Synthesizes 12K+ characters of research via Claude
+4. Generates a proper literature review (surveys the field, cites real data)
+5. Assesses, rewrites (≤3×), plagiarism-checks, generates figures
+
+**Expected performance:**
+- Code → Paper: 10 agent calls, ~$1.67, AI score <2/10
+- Topic → Review: 12 agent calls, ~$2.08, AI score <2/10
+- All sections typically score 7-9/10
+
 ### Other tools
 
 ```bash
@@ -205,6 +291,14 @@ flask --app app run --port 5050 --debug
 
 Open **http://localhost:5000** in your browser.
 
+To add the PaperForge web UI, register the blueprint in your Flask app:
+```python
+from agentic.web_server import paperforge_bp
+app.register_blueprint(paperforge_bp)
+```
+
+Or run standalone: `python -m agentic.web_server` (opens on port 5055).
+
 ### Pages
 
 - **Dashboard** — index stats, quick-ask box, recent sessions
@@ -212,6 +306,7 @@ Open **http://localhost:5000** in your browser.
 - **Compare Models** — ask multiple models simultaneously, see side-by-side comparison
 - **Sessions** — browse, view, and delete saved Q&A sessions
 - **Manage Index** — start background indexing with progress tracking
+- **PaperForge** — generate papers from code or topics with live SSE progress streaming, section scores, and paper download
 
 ## Supported Models
 
@@ -268,6 +363,7 @@ Edit the `MODELS` dict in `common.py` to change model versions or add new provid
 
 ## Architecture
 
+### RAG Research
 ```
 Index:  Zotero API → ZOTERO_STORAGE PDFs → pdfplumber → text
         → chunk (800 char, 200 overlap, sentence-boundary aware)
@@ -280,6 +376,24 @@ Query:  question → embed → ChromaDB top-k → deduplicate (max 3 chunks/sour
 
 Compare:  same RAG context → parallel ThreadPoolExecutor calls
           → side-by-side Rich table (CLI) or card grid (web UI)
+```
+
+### PaperForge Multi-Agent Pipeline
+```
+Code/Review → LangGraph StateGraph → 7-agent pipeline
+              │
+              ├─ Code Analyst (Gemini CLI)     or Literature Researcher (OpenAlex + DuckDuckGo)
+              ├─ Writer (DeepSeek API)          → cleanup_prose() post-processing
+              ├─ Assessor (Claude CLI)          → _extract_json() brace-matching parser
+              ├─ Rewriter (Claude CLI)          ↻ up to 3× until score ≥ 7
+              ├─ Plagiarism Check (DeepSeek API) → report-only, no loop
+              ├─ Figure Gen (Gemini CLI)         ↻ up to 3× until PASS
+              └─ Figure Supervisor (Claude CLI)
+
+Bridge:  Claude → claude CLI (shell=False, list args)
+         DeepSeek → direct HTTP API (OpenAI-compatible /v1/chat/completions)
+         Gemini → gemini CLI (--approval-mode plan, no tool execution)
+         Fallback chain: claude → deepseek → gemini
 ```
 
 Every model call is logged to `~/thesis/logs/YYYY-MM-DD.jsonl` with timestamp, model, prompt, response, and cost — ready for AI-usage disclosure.
