@@ -32,11 +32,51 @@ For each finding, include the source URL so citations can be traced. Organize by
 Be specific — include company names, funding amounts, publication venues, DOIs, market sizes, and timelines. Write in note-taking style suitable for a Writer agent to convert into academic prose."""
 
 
-def _search_openalex(topic: str, max_results: int = MAX_ACADEMIC) -> str:
-    """Search OpenAlex for academic papers. No API key needed.
+def _search_semantic_scholar(topic: str, max_results: int = MAX_ACADEMIC) -> str:
+    """Search Semantic Scholar for academic papers. Free, no API key needed.
 
-    Mirrors the approach in research_assistant/research/discover.py.
+    Better quality results than OpenAlex — includes citation counts, influential
+    citations, and publication venues. Focuses on recent (2020+) papers.
     """
+    try:
+        from semanticscholar import SemanticScholar
+        sch = SemanticScholar(timeout=30)
+        papers = sch.search_paper(topic, limit=max_results,
+                                   fields=["title","year","authors"," journal",
+                                           "citationCount","externalIds","abstract"])
+
+        results = []
+        for p in papers:
+            title = getattr(p, "title", "Unknown") or "Unknown"
+            year = getattr(p, "year", None) or "?"
+            cited = getattr(p, "citationCount", 0) or 0
+            authors = getattr(p, "authors", []) or []
+            first_author = authors[0].name if authors else ""
+            journal = (getattr(p, "journal", None) or {})
+            venue = (journal.get("name", "") if isinstance(journal, dict) else str(journal)) if journal else ""
+            doi = (getattr(p, "externalIds", None) or {}).get("DOI", "")
+            doi_url = f"https://doi.org/{doi}" if doi else ""
+            abstract = getattr(p, "abstract", "") or ""
+            abstract = abstract[:300] if abstract else ""
+
+            author_str = f"{first_author} et al." if first_author and len(authors) > 1 else first_author
+            venue_str = f" *{venue}*" if venue else ""
+
+            results.append(
+                f"- **{title}** ({year}) — {author_str}{venue_str}\n"
+                f"  Cited {cited}×. {abstract}{'...' if len(abstract) >= 300 else ''}\n"
+                f"  {doi_url if doi_url else ''}"
+            )
+
+        return "\n".join(results) if results else "(No academic papers found)"
+    except ImportError:
+        return "(Semantic Scholar library not installed)"
+    except Exception as e:
+        return f"(Semantic Scholar error: {e})"
+
+
+def _search_openalex(topic: str, max_results: int = MAX_ACADEMIC) -> str:
+    """Fallback: Search OpenAlex if Semantic Scholar fails."""
     try:
         params = f"search={quote(topic)}&sort=cited_by_count:desc&per_page={max_results}"
         url = f"https://api.openalex.org/works?{params}"
@@ -48,28 +88,16 @@ def _search_openalex(topic: str, max_results: int = MAX_ACADEMIC) -> str:
         for work in data.get("results", []):
             title = work.get("title", "Unknown")
             doi = work.get("doi", "")
-            doi_url = f"https://doi.org/{doi}" if doi else ""
             year = work.get("publication_year", "?")
             cited = work.get("cited_by_count", 0)
-            authorships = work.get("authorships", [])
-            first_author = authorships[0].get("author", {}).get("display_name", "") if authorships else ""
-            primary_loc = work.get("primary_location") or {}
-            venue = (primary_loc.get("source") or {}).get("display_name", "")
-            abstract = ""
-            if work.get("abstract_inverted_index"):
-                idx = work["abstract_inverted_index"]
-                words = sorted([(pos, w) for w, positions in idx.items() for pos in positions])
-                abstract = " ".join(w for _, w in words)[:400]
-
             results.append(
-                f"- **{title}** ({year}) — {first_author} et al. *{venue}*\n"
-                f"  Cited {cited}×. {abstract[:250]}{'...' if len(abstract) > 250 else ''}\n"
-                f"  DOI: {doi_url}"
+                f"- **{title}** ({year}) — Cited {cited}×.\n"
+                f"  DOI: https://doi.org/{doi}" if doi else f"- **{title}** ({year})"
             )
 
         return "\n".join(results) if results else "(No academic papers found)"
-    except (URLError, json.JSONDecodeError, OSError) as e:
-        return f"(OpenAlex search error: {e})"
+    except Exception as e:
+        return f"(OpenAlex error: {e})"
 
 
 def _search_web(query: str, max_results: int = MAX_WEB) -> str:
@@ -92,9 +120,12 @@ def _gather_research(topic: str) -> str:
     """Run academic + web searches on different aspects of the topic."""
     sections = []
 
-    # 1. Academic literature via OpenAlex
-    print(f"  [Research] OpenAlex: searching academic papers...", file=sys.stderr)
-    sections.append(f"## Academic Literature (via OpenAlex)\n\n{_search_openalex(topic)}\n")
+    # 1. Academic literature via Semantic Scholar (primary) or OpenAlex (fallback)
+    print(f"  [Research] Semantic Scholar: searching academic papers...", file=sys.stderr)
+    academic = _search_semantic_scholar(topic)
+    if academic.startswith("(Semantic Scholar"):
+        academic = _search_openalex(topic)
+    sections.append(f"## Academic Literature\n\n{academic}\n")
 
     # 2-5. Web searches for companies, market, clinical
     web_queries = [
