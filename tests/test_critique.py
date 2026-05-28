@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from critique import _number_sentences
+from research_assistant.writing.critique import _number_sentences
 
 
 class TestNumberSentences:

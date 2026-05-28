@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from verify import extract_bib_keys, extract_draft_keys
+from research_assistant.verification.verify import extract_bib_keys, extract_draft_keys
 
 
 class TestExtractDraftKeys:

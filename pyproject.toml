@@ -1,0 +1,132 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-assistant"
+version = "1.0.0"
+description = "CLI toolkit + web/desktop UI for master's and PhD thesis research — RAG over your Zotero library, multi-model comparison, writing pipeline, and citation auditing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Furkan Emre Bora", email = "furkanemrebora@gmail.com" }]
+keywords = ["thesis", "research", "rag", "zotero", "academic", "writing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+dependencies = [
+    "litellm>=1.50.0",
+    "pyzotero>=1.5.20",
+    "paper-qa>=5.0.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+    "rich>=13.7.0",
+    "chromadb>=0.5.0",
+    "pdfplumber>=0.11.0",
+    "flask>=3.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+desktop = ["pywebview>=5.0"]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/femrebora/research-assistant"
+Issues = "https://github.com/femrebora/research-assistant/issues"
+
+[project.scripts]
+# Top-level entry points
+ra = "research_assistant.web.app:_cli"
+ra-web = "research_assistant.web.app:_cli"
+ra-desktop = "research_assistant.web.desktop:main"
+ra-researcher = "research_assistant.researcher:main"
+ra-pipeline = "research_assistant.pipeline:main"
+
+# Research subpackage
+ra-ask = "research_assistant.research.ask:main"
+ra-compare = "research_assistant.research.compare:main"
+ra-zot = "research_assistant.research.zot:main"
+ra-discover = "research_assistant.research.discover:main"
+ra-evidence = "research_assistant.research.evidence:main"
+
+# Writing subpackage
+ra-ideas = "research_assistant.writing.ideas:main"
+ra-outline = "research_assistant.writing.outline:main"
+ra-critique = "research_assistant.writing.critique:main"
+ra-critic = "research_assistant.writing.critic:main"
+ra-paraphrase = "research_assistant.writing.paraphrase:main"
+ra-coherence = "research_assistant.writing.coherence:main"
+ra-disclose = "research_assistant.writing.disclose:main"
+
+# Verification subpackage
+ra-audit = "research_assistant.verification.audit:main"
+ra-claim-verify = "research_assistant.verification.claim_verify:main"
+ra-originality = "research_assistant.verification.originality:main"
+ra-paraphrase-check = "research_assistant.verification.paraphrase_check:main"
+ra-verify = "research_assistant.verification.verify:main"
+
+[tool.setuptools.packages.find]
+include = ["research_assistant*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+"research_assistant.web" = ["templates/*.html", "static/*.css"]
+
+# ── Test config ─────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+markers = [
+    "unit: fast unit tests with no external services",
+    "integration: tests that touch external APIs or Zotero",
+    "slow: tests that take more than a few seconds",
+]
+
+# ── Linting / formatting ────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["**/__pycache__", ".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "E501",   # line length handled by formatter
+    "B008",   # function calls in defaults (common with Click)
+    "RUF012", # mutable class attrs without ClassVar (over-strict)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401"]            # test-only imports
+"research_assistant/web/app.py" = ["E402"]  # late imports inside routes
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ── Type checking ───────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = true
+exclude = ["build", "dist", "tests"]

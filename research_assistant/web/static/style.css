@@ -1,0 +1,29 @@
+/* Research Assistant — Tailwind overrides & small extras.
+   Most styling lives in Tailwind utility classes in the templates.
+   This file exists for tiny tweaks Tailwind can't do conveniently. */
+
+/* Smooth scrolling for in-page anchors */
+html { scroll-behavior: smooth; }
+
+/* Make the result <pre> use a nicer mono stack if available */
+pre, code { font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+
+/* Prose tweaks for rendered session markdown */
+.prose blockquote {
+    border-left: 3px solid #e5e7eb;
+    padding-left: 0.75rem;
+    color: #475569;
+    font-style: italic;
+    margin: 0.75rem 0;
+}
+.prose h1, .prose h2, .prose h3 { color: #0f172a; font-weight: 600; }
+.prose h1 { font-size: 1.5rem; margin-top: 1.5rem; }
+.prose h2 { font-size: 1.25rem; margin-top: 1.25rem; }
+.prose h3 { font-size: 1.1rem; margin-top: 1rem; }
+.prose hr { border-color: #e5e7eb; margin: 1rem 0; }
+.prose code.citekey { background: #eef2ff; color: #4338ca; padding: 0.05rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
+
+/* HTMX indicator transitions */
+.htmx-indicator { opacity: 0; transition: opacity 200ms ease-in-out; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { opacity: 1; }

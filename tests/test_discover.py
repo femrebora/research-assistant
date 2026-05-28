@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from discover import Paper, _abstract_from_inverted, to_bibtex
+from research_assistant.research.discover import Paper, _abstract_from_inverted, to_bibtex
 
 
 class TestPaper:
@@ -49,7 +50,7 @@ class TestPaper:
 
     def test_immutable(self):
         p = Paper(title="X", authors=("A",), year=2024)
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             p.title = "Y"  # type: ignore[misc]
 
 

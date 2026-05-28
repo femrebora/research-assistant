@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from audit import (
+from research_assistant.verification.audit import (
     build_audit,
     find_duplicate_bib_keys,
     paragraph_keys,

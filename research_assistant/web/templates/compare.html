@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-semibold text-slate-900">Compare models</h2>
+    <p class="text-sm text-slate-500 mt-1">Ask the same question to multiple AI models side-by-side.</p>
+</div>
+
+<div class="bg-white rounded-lg border border-slate-200 p-5 mb-6">
+    <form method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Question</label>
+            <textarea name="question" rows="3" required placeholder="Your research question…"
+                      class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">{{ question }}</textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-2">Models to compare</label>
+            <div class="grid grid-cols-3 md:grid-cols-5 gap-2">
+                {% for alias in models %}
+                <label class="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-md text-sm cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" name="models" value="{{ alias }}"
+                           {% if alias in selected_models %}checked{% endif %}
+                           class="rounded border-slate-300">
+                    <span>{{ alias }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <details class="text-xs text-slate-500 cursor-pointer select-none mt-2">
+                <summary class="text-slate-600 hover:text-slate-800">When should I pick which models?</summary>
+                <p class="mt-1 leading-relaxed">
+                    Pick 2--4 models from different families to surface disagreements.
+                    <strong>Claude</strong> and <strong>GPT</strong> are strong on prose;
+                    <strong>Gemini</strong> is strong on multi-document synthesis;
+                    <strong>DeepSeek</strong> is cheap and good at structured tasks;
+                    <strong>Sonnet/Haiku/Flash/gpt-mini</strong> are faster + cheaper variants for high-volume use.
+                    With <em>--rag</em> on, all models see the same retrieved context -- so disagreement is about
+                    interpretation, not access.
+                </p>
+            </details>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-4">
+            <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="use_rag" {% if use_rag %}checked{% endif %}
+                       {% if not index_exists %}disabled{% endif %}
+                       class="rounded border-slate-300">
+                <span>Use RAG context</span>
+                {% if not index_exists %}<span class="text-slate-400 text-xs">(no index)</span>{% endif %}
+            </label>
+            <div class="flex items-center gap-2 text-sm">
+                <label for="save_name" class="text-slate-700">Save as</label>
+                <input type="text" name="save_name" id="save_name" placeholder="comparison name (optional)" value="{{ save_name }}"
+                       class="px-3 py-1.5 border border-slate-300 rounded-md text-sm">
+            </div>
+        </div>
+
+        <button type="submit"
+                class="px-4 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition">
+            Compare
+        </button>
+    </form>
+</div>
+
+{% if outcomes %}
+<div>
+    <h3 class="text-base font-semibold text-slate-900 mb-3">Comparison results</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for model_name, r in outcomes.items() %}
+        <div class="bg-white rounded-lg border border-slate-200 p-4">
+            <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">{{ model_name }}</span>
+                <span class="text-xs text-slate-500 font-mono">{{ r.input_tokens }}/{{ r.output_tokens }}</span>
+            </div>
+            <div class="prose prose-slate prose-sm max-w-none text-sm leading-relaxed">
+                {{ r.answer | safe_nl2br }}
+            </div>
+            {% if r.cost %}
+            <div class="text-right text-xs text-slate-500 font-mono mt-3 pt-2 border-t border-slate-100">${{ "%.4f"|format(r.cost) }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

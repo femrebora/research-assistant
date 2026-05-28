@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from paraphrase_check import split_paragraphs
+from research_assistant.verification.paraphrase_check import split_paragraphs
 
 
 class TestSplitParagraphs:

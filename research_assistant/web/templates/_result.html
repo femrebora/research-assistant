@@ -1,0 +1,46 @@
+{# HTMX partial: rendered into #tool-result after a tool runs. #}
+<div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+        <div class="flex items-center gap-3">
+            {% if result.exit_code == 0 %}
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Success
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                Exit {{ result.exit_code }}
+            </span>
+            {% endif %}
+            <span class="text-xs text-slate-500 font-mono truncate max-w-2xl" title="{{ argv_display }}">
+                $ {{ module_name }}.py {{ argv_display }}
+            </span>
+        </div>
+        <button onclick="copyResult(this)" data-target="result-output"
+                class="px-2.5 py-1 text-xs font-medium rounded text-slate-600 hover:bg-slate-200 transition">
+            Copy
+        </button>
+    </div>
+
+    {% if result.error %}
+    <div class="px-5 py-3 bg-rose-50 border-b border-rose-100 text-sm text-rose-800">
+        <p class="font-medium mb-0.5">Error</p>
+        <pre class="text-xs whitespace-pre-wrap font-mono">{{ result.error }}</pre>
+    </div>
+    {% endif %}
+
+    <pre id="result-output" class="px-5 py-4 text-xs font-mono whitespace-pre-wrap text-slate-800 overflow-x-auto max-h-[70vh]">{{ result.output }}</pre>
+</div>
+
+<script>
+function copyResult(btn) {
+    const el = document.getElementById(btn.dataset.target);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = orig; }, 1200);
+    });
+}
+</script>

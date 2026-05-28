@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
-# One-command setup for thesis-tools.
-# Run from inside the thesis-tools directory.
+# One-command setup for research-assistant.
+# Run from inside the research-assistant directory.
 
 set -e
 
-echo "→ Creating Python virtualenv at ~/.venvs/thesis"
-python3 -m venv ~/.venvs/thesis
+VENV="${RA_VENV:-$HOME/.venvs/thesis}"
 
-echo "→ Activating and installing dependencies"
+echo "→ Creating Python virtualenv at $VENV"
+python3 -m venv "$VENV"
+
+echo "→ Activating and installing the package in editable mode (with dev + desktop extras)"
 # shellcheck disable=SC1090
-source ~/.venvs/thesis/bin/activate
+source "$VENV/bin/activate"
 pip install --upgrade pip
-pip install -r requirements.txt
-
-echo "→ Making scripts executable"
-chmod +x ./*.py
+pip install -e ".[dev,desktop]"
 
 if [ ! -f .env ]; then
     echo "→ Creating .env from template (you must edit it with your keys)"
@@ -24,5 +23,10 @@ fi
 echo ""
 echo "Done. Next steps:"
 echo "  1. Edit .env with your API keys and paths"
-echo "  2. source ~/.venvs/thesis/bin/activate"
-echo "  3. Test with: ./ask.py 'hello' --model claude"
+echo "  2. source $VENV/bin/activate"
+echo "  3. Test CLI:     ra-ask 'hello' --model claude"
+echo "  4. Index PDFs:   ra-researcher index"
+echo "  5. Web UI:       ra-web              # browser at http://127.0.0.1:5050"
+echo "  6. Desktop app:  ra-desktop          # native window"
+echo ""
+echo "Run 'ra-<TAB><TAB>' for the full list of installed commands."

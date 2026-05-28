@@ -9,14 +9,13 @@ import pytest
 # Add parent dir to path so we can import researcher
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from researcher import (
+from research_assistant.researcher import (
     _extract_citekey,
     _extract_metadata,
     build_context,
     chunk_text,
     deduplicate_by_source,
 )
-
 
 # ── chunk_text ───────────────────────────────────────────────────────────────
 
