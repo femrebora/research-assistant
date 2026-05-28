@@ -101,16 +101,56 @@ def _search_openalex(topic: str, max_results: int = MAX_ACADEMIC) -> str:
 
 
 def _search_web(query: str, max_results: int = MAX_WEB) -> str:
-    """Search DuckDuckGo for companies, market data, and news."""
+    """Search web using Brave (best) or DuckDuckGo (fallback)."""
+    import os
+
+    # Try Brave Search API first
+    api_key = os.getenv("BRAVE_API_KEY", "")
+    if api_key:
+        try:
+            from urllib.parse import quote
+            from urllib.request import Request, urlopen
+            import gzip
+            import json as _json
+
+            params = f"q={quote(query)}&count={max_results}"
+            req = Request(
+                f"https://api.search.brave.com/res/v1/web/search?{params}",
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip",
+                    "X-Subscription-Token": api_key,
+                },
+            )
+            with urlopen(req, timeout=15) as resp:
+                raw = resp.read()
+                if raw[:2] == b'\x1f\x8b':
+                    raw = gzip.decompress(raw)
+                data = _json.loads(raw.decode("utf-8"))
+
+            results = []
+            for r in (data.get("web", {}).get("results", []) or [])[:max_results]:
+                results.append(
+                    f"- **{r.get('title', '')}**\n"
+                    f"  {r.get('description', '')[:300]}\n"
+                    f"  URL: {r.get('url', '')}"
+                )
+            if results:
+                return "\n".join(results)
+        except Exception:
+            pass  # Fall through to DDG
+
+    # DuckDuckGo fallback
     try:
         from ddgs import DDGS
         results = []
         with DDGS() as ddgs:
             for r in ddgs.text(query, max_results=max_results):
-                title = r.get("title", "")
-                href = r.get("href", "")
-                body = r.get("body", "")
-                results.append(f"- **{title}**\n  {body[:300]}\n  URL: {href}")
+                results.append(
+                    f"- **{r.get('title', '')}**\n"
+                    f"  {r.get('body', '')[:300]}\n"
+                    f"  URL: {r.get('href', '')}"
+                )
         return "\n".join(results) if results else f"(No results for: {query})"
     except Exception as e:
         return f"(Web search error: {e})"
