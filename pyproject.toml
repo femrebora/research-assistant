@@ -70,6 +70,7 @@ ra-outline = "research_assistant.writing.outline:main"
 ra-critique = "research_assistant.writing.critique:main"
 ra-critic = "research_assistant.writing.critic:main"
 ra-paraphrase = "research_assistant.writing.paraphrase:main"
+ra-outline-recommender = "research_assistant.writing.outline_recommender:main"
 ra-coherence = "research_assistant.writing.coherence:main"
 ra-disclose = "research_assistant.writing.disclose:main"
 
