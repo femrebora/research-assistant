@@ -14,13 +14,15 @@ git clone https://github.com/femrebora/research-assistant
 cd research-assistant
 ./setup.sh
 source ~/.venvs/thesis/bin/activate
-cp env.example .env    # then edit .env with your API keys
+cp env.example .env    # add at least one API key, or use /settings in the UI later
 ra-web                 # open http://127.0.0.1:5050
 ```
 
 ## Configuration
 
-Put your keys in `.env`. At minimum, set one model provider:
+After launching, open `http://127.0.0.1:5050/settings` to configure everything from the browser. The settings page shows which API keys are set, and lets you edit paths, Zotero details, CLI provider commands, and timeouts. Changes are written back to your `.env` file automatically.
+
+If you prefer to edit `.env` directly, add at least one model provider:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
@@ -29,7 +31,7 @@ DEEPSEEK_API_KEY=sk-...
 OPENAI_API_KEY=sk-...
 ```
 
-For Zotero integration, also set:
+For Zotero integration, set these (from the UI at `/settings` or directly in `.env`):
 
 ```bash
 ZOTERO_USER_ID=1234567
@@ -38,7 +40,7 @@ THESIS_ROOT=/home/you/thesis          # default: ~/thesis
 ZOTERO_STORAGE=/home/you/Zotero/storage
 ```
 
-All model calls are logged to `~/thesis/logs/` for disclosure purposes. Use the built-in disclosure tool in the web UI to generate a venue-ready statement.
+Check `/providers` in the web UI to verify each provider is healthy with a quick test ping. All model calls are logged to `~/thesis/logs/` for disclosure purposes. Use the built-in disclosure tool in the web UI to generate a venue-ready statement.
 
 ## Web UI
 
@@ -57,6 +59,8 @@ The dashboard at `http://127.0.0.1:5050` gives you:
 - **Orchestration** — model usage dashboard: per-model calls, tokens, cost, daily spend sparkline at `/orchestration`
 - **Prompt Library** — 10 curated prompts across 10 academic categories, one-click copy or send-to-Ask at `/prompts`
 - **Workspace** — full-text editor with per-project file management and undo at `/workspace`
+- **Settings** — check which API keys are configured, edit paths, Zotero details, CLI provider commands, and timeouts at `/settings`
+- **Providers** — test each model provider with a quick ping to verify it works at `/providers`
 - **PaperForge** — generate papers from code or topics with live SSE progress at `/paperforge`
 
 ## PaperForge — Multi-Agent Paper Generation
