@@ -5,7 +5,7 @@
 [![Web UI](https://img.shields.io/badge/web%20UI-Flask-000000?logo=flask\&logoColor=white)](https://flask.palletsprojects.com/)
 [![Models](https://img.shields.io/badge/models-Claude%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20GPT--5-7C3AED)](#supported-models)
 
-**research-assistant** is a local-first academic research workspace for thesis writing, literature review, citation-aware drafting, paper discovery, model comparison, and transparent AI-assisted research workflows.
+**research-assistant** is a local first academic research workspace for thesis writing, literature review, citation-aware drafting, paper discovery, model comparison, and transparent AI assisted research workflows.
 
 It combines a Flask Web UI, Zotero-indexed retrieval, multi-model comparison, academic writing tools, AI usage disclosure logs, and PaperForge, a multi-agent paper drafting pipeline.
 
