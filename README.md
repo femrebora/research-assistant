@@ -77,9 +77,8 @@ The goal is to help researchers work with their own papers, ask better questions
 ```bash
 git clone https://github.com/femrebora/research-assistant
 cd research-assistant
-./setup.sh
+bash setup.sh
 source ~/.venvs/thesis/bin/activate
-cp env.example .env
 ra-web
 ```
 

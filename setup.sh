@@ -31,6 +31,8 @@ text = env_path.read_text()
 
 home = str(Path.home())
 
+text = text.replace("# THESIS_ROOT=~/thesis", f"THESIS_ROOT={home}/thesis")
+text = text.replace("# ZOTERO_STORAGE=~/Zotero/storage", f"ZOTERO_STORAGE={home}/Zotero/storage")
 text = text.replace("THESIS_ROOT=/home/emre/thesis", f"THESIS_ROOT={home}/thesis")
 text = text.replace("ZOTERO_STORAGE=/home/emre/Zotero/storage", f"ZOTERO_STORAGE={home}/Zotero/storage")
 text = text.replace("THESIS_ROOT=~/thesis", f"THESIS_ROOT={home}/thesis")
