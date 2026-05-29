@@ -138,7 +138,7 @@ ignore = [
 "agentic/prompts/*.py" = ["RUF001"]
 "agentic/agents/*.py" = ["RUF001"]
 "agentic/text_cleanup.py" = ["RUF001"]
-"quick_ai_score.py" = ["RUF001"]
+"agentic/quick_ai_score.py" = ["RUF001"]
 "tests/test_text_cleanup.py" = ["RUF001"]  # unicode fixtures are the test data
 
 [tool.ruff.format]

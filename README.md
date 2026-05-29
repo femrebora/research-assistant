@@ -71,7 +71,7 @@ PaperForge generates complete academic papers from a codebase or a research topi
 |--------|---------|
 | `run_agentic.py` | **Code to Paper** — generate an academic paper from a codebase |
 | `run_review.py` | **Topic to Review Article** — autonomous web research + review generation |
-| `quick_ai_score.py` | **AI Text Detection** — 7 mechanical checks, 0-10 score, no LLM calls |
+| `agentic/quick_ai_score.py` | **AI Text Detection** — 7 mechanical checks, 0-10 score, no LLM calls |
 
 ### Pipeline
 
@@ -104,7 +104,7 @@ For review articles, `Code Analyst` is replaced by `Literature Researcher` which
 ./run_review.py --topic "CRISPR-Based Therapeutics: Delivery Methods"
 
 # Check a paper for AI-generated patterns
-./quick_ai_score.py paper.md --json
+./agentic/quick_ai_score.py paper.md --json
 ```
 
 **Expected results:** AI score <2/10 (human-like), all sections 7-9/10, $1.50-2.00 per run, zero em dashes.
