@@ -489,7 +489,7 @@ ra-disclose
   </thead>
   <tbody>
     <tr>
-      <td>Master thesis writing</td>
+      <td>Thesis helper</td>
       <td>Organizes papers, project context, prompts, drafts, and model outputs in one place.</td>
     </tr>
     <tr>
