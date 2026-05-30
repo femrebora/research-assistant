@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Publication-quality chart generation for academic review articles.
 
+Note: For use within the agentic pipeline, prefer agentic/mcp_servers/chart_server.py
+which exposes these chart types as an MCP server integrated with the orchestrator.
+This standalone module is kept for direct CLI use and demo generation.
+
 Generates matplotlib/seaborn figures with professional styling suitable for
 journal publication. Replaces the Mermaid-based approach that produced
 poorly-styled charts.

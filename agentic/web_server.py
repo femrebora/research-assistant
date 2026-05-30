@@ -31,7 +31,6 @@ paperforge_bp = Blueprint(
     "paperforge",
     __name__,
     template_folder="templates",
-    static_folder="static",
 )
 
 THESIS_ROOT = Path(os.getenv("THESIS_ROOT", str(Path.home() / "thesis")))

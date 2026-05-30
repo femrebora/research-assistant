@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """check_zerogpt.py — automated ZeroGPT AI detection via Playwright.
 
+Note: For programmatic use, prefer agentic/mcp_servers/zerogpt_server.py which
+provides the same functionality as an MCP server.
+
 ZeroGPT has no API. This script uses Playwright to paste text into
 zerogpt.com and extract the AI probability score.
 
 Usage:
-    ./check_zerogpt.py paper.md
-    ./check_zerogpt.py paper.md --json
+    ./scripts/check_zerogpt.py paper.md
+    ./scripts/check_zerogpt.py paper.md --json
 """
 from __future__ import annotations
 

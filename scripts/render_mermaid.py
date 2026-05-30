@@ -5,9 +5,9 @@ Extracts ```mermaid code blocks, renders each to PNG via mmdc (mermaid-cli),
 and saves them alongside the markdown file.
 
 Usage:
-    ./render_mermaid.py paper.md              # renders to paper_figures/
-    ./render_mermaid.py paper.md --inline      # replaces mermaid blocks with <img> tags
-    ./render_mermaid.py paper.md --output-dir figs
+    ./scripts/render_mermaid.py paper.md              # renders to paper_figures/
+    ./scripts/render_mermaid.py paper.md --inline      # replaces mermaid blocks with <img> tags
+    ./scripts/render_mermaid.py paper.md --output-dir figs
 """
 from __future__ import annotations
 

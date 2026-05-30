@@ -28,7 +28,6 @@ def main(job_id: str, charts_source: str | None = None):
     figs_dir = out_dir / "figures"
     figs_dir.mkdir(parents=True, exist_ok=True)
     dest = out_dir / "paper_final.docx"
-    alt_dest = Path("/home/bogrum/thesis/output/chem713-paper/CHEM713_final.docx")
 
     # Copy real charts if provided
     if charts_source:
@@ -69,7 +68,7 @@ def main(job_id: str, charts_source: str | None = None):
     print(f"Paper: {len(draft)} chars, {len(available)} figures")
 
     # Generate DOCX
-    for d in [dest, alt_dest]:
+    for d in [dest]:
         try:
             export_to_docx(draft, str(figs_dir), str(d))
             print(f"DOCX: {d} ({Path(d).stat().st_size / 1024:.0f} KB)")

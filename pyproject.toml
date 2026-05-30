@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-desktop = ["pywebview>=5.0"]
+desktop = ["pywebview>=5.0", "streamlit>=1.28.0"]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
@@ -89,11 +89,12 @@ ra-paraphrase-check = "research_assistant.verification.paraphrase_check:main"
 ra-verify = "research_assistant.verification.verify:main"
 
 [tool.setuptools.packages.find]
-include = ["research_assistant*"]
+include = ["research_assistant*", "agentic*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 "research_assistant.web" = ["templates/*.html", "templates/macros/*.html", "static/*.css", "static/*.js"]
+"agentic" = ["templates/*.html"]
 
 # ── Test config ──────────────────────────────────────────────────────────
 [tool.pytest.ini_options]

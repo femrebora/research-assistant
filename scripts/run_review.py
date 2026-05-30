@@ -5,8 +5,8 @@ The pipeline does its OWN web research via DuckDuckGo — no pre-compiled
 research file needed. Just provide a topic.
 
 Usage:
-    ./run_review.py --topic "Personalized Medicine: AI and Multi-Omics Integration"
-    ./run_review.py --topic "CRISPR-Based Therapeutics" --output /tmp/crispr-paper
+    ./scripts/run_review.py --topic "Personalized Medicine: AI and Multi-Omics Integration"
+    ./scripts/run_review.py --topic "CRISPR-Based Therapeutics" --output /tmp/crispr-paper
 """
 from __future__ import annotations
 

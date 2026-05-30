@@ -2,10 +2,10 @@
 """run_agentic.py — entry point for the PaperForge agentic pipeline.
 
 Usage:
-    ./run_agentic.py /path/to/code --summary "My project does X" --output /path/to/output
-    ./run_agentic.py --refresh-style
-    ./run_agentic.py --refresh-artifacts
-    ./run_agentic.py --ui
+    ./scripts/run_agentic.py /path/to/code --summary "My project does X" --output /path/to/output
+    ./scripts/run_agentic.py --refresh-style
+    ./scripts/run_agentic.py --refresh-artifacts
+    ./scripts/run_agentic.py --ui
 """
 from __future__ import annotations
 

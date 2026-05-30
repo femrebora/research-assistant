@@ -5,8 +5,8 @@ Uses Claude to generate Mermaid syntax for each figure description, then
 renders them to PNG via mmdc. Claude natively understands Mermaid syntax.
 
 Usage:
-    ./mermaid_figures.py paper.md              # adds mermaid blocks, renders to PNG
-    ./mermaid_figures.py paper.md --no-render   # only add mermaid, skip PNG rendering
+    ./scripts/mermaid_figures.py paper.md              # adds mermaid blocks, renders to PNG
+    ./scripts/mermaid_figures.py paper.md --no-render   # only add mermaid, skip PNG rendering
 """
 from __future__ import annotations
 
