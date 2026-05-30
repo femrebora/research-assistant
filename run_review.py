@@ -30,7 +30,7 @@ def main(topic, output, max_rewrites):
 
     if not output:
         slug = topic.lower().replace(" ", "-").replace(":", "")[:40]
-        from common import THESIS_ROOT
+        from research_assistant.common import THESIS_ROOT
         output = str(THESIS_ROOT / "output" / f"review-{slug}")
 
     click.echo(f"Topic: {topic}")

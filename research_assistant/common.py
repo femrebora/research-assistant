@@ -91,10 +91,11 @@ MAX_RETRIES = 3
 RETRY_BACKOFF = 2.0  # seconds, doubles each retry
 
 _thesis_env = os.getenv("THESIS_ROOT")
-if _thesis_env:
-    THESIS_ROOT = Path(_thesis_env).expanduser().resolve()
-else:
-    THESIS_ROOT = Path.home() / "thesis"
+THESIS_ROOT = (
+    Path(_thesis_env).expanduser().resolve()
+    if _thesis_env
+    else Path.home() / "thesis"
+)
 
 LOG_DIR = THESIS_ROOT / "logs"
 

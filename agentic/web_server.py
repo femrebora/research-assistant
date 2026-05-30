@@ -78,7 +78,6 @@ def _run_pipeline_in_thread(job_id: str, code_path: str, summary: str,
         _sys.stderr = captured_stderr
 
         import agentic.orchestrator as orch
-        from agentic.orchestrator import build_graph, load_caches
         from agentic.orchestrator import build_graph, build_review_graph, load_caches
         from agentic.state import make_initial_state
 

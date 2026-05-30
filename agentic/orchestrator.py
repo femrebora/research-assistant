@@ -1,7 +1,6 @@
 """LangGraph orchestrator — compiles the paper generation state machine."""
 from __future__ import annotations
 
-import contextlib
 import json
 from typing import TYPE_CHECKING
 
@@ -83,7 +82,6 @@ def _log(agent: str, msg: str = "") -> None:
 def build_graph():
     """Build and compile the paper generation state machine."""
     from langgraph.graph import END, StateGraph
-    from langgraph.graph import END, StateGraph  # lazy — langgraph is an optional PaperForge dep
 
     builder = StateGraph(PaperState)
 

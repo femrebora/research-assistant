@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import click
-from common import THESIS_ROOT
+from research_assistant.common import THESIS_ROOT
 
 from agentic.agents.ai_artifact_detector import run_ai_artifact_detector
 from agentic.agents.style_researcher import run_style_researcher
