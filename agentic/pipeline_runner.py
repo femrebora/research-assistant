@@ -66,8 +66,8 @@ def run_generate(job_id: str):
             append_event(job_id, {
                 "type": "agent", "agent": "Outline", "message": "Planning structure..."
             })
-            from research_assistant.writing.outline_recommender import build_structure_prompt
             from agentic.bridge import call_agent
+            from research_assistant.writing.outline_recommender import build_structure_prompt
             topic = state.get("user_summary", "") or state.get("topic", "")
             prompt = build_structure_prompt(topic=topic, paper_type_key="imrad",
                                              discipline="computational", audience="academic", target_words=5000)
@@ -85,9 +85,10 @@ def run_generate(job_id: str):
                 "message": f"Done: {len(state['outline'])} chars"
             })
         except Exception:
-            import traceback, sys
-            print("ERROR in outline/paraphrase:", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            import sys as _sys
+            import traceback as _tb
+            print("ERROR in outline/paraphrase:", file=_sys.stderr)
+            _tb.print_exc(file=_sys.stderr)
 
         # ── Step 2b: Writer ──────────────────────────────────────────────
         append_event(job_id, {
@@ -117,9 +118,10 @@ def run_generate(job_id: str):
                 "type": "agent", "agent": "Paraphrase", "message": "Done"
             })
         except Exception:
-            import traceback, sys
-            print("ERROR in outline/paraphrase:", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            import sys as _sys
+            import traceback as _tb
+            print("ERROR in outline/paraphrase:", file=_sys.stderr)
+            _tb.print_exc(file=_sys.stderr)
 
         # Parse into sections and score them
         sections = parse_sections(state.get("draft", ""))
@@ -266,7 +268,8 @@ def run_assess_revise(job_id: str):
                 if peer.synthesis:
                     state["peer_review_synthesis"] = peer.synthesis
             except Exception:
-                import traceback; traceback.print_exc()
+                import traceback as _tb2
+            _tb2.print_exc()
 
             append_event(job_id, {
                 "type": "assessment_ready",
@@ -363,8 +366,9 @@ def run_finalize(job_id: str):
                 "type": "agent", "agent": "Claim Verify",
                 "message": "Verifying claims..."
             })
-            from research_assistant.verification.claim_verify import verify_claim
             import re
+
+            from research_assistant.verification.claim_verify import verify_claim
             draft = state.get("draft", "")
             claims = [s.strip() for s in re.split(r'(?<=[.!?])\s+', draft)
                       if len(s.strip()) > 80 and any(w in s.lower() for w in
@@ -379,9 +383,10 @@ def run_finalize(job_id: str):
                     pass
             state["claim_verify"] = verified
         except Exception:
-            import traceback, sys
-            print("ERROR in outline/paraphrase:", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            import sys as _sys
+            import traceback as _tb
+            print("ERROR in outline/paraphrase:", file=_sys.stderr)
+            _tb.print_exc(file=_sys.stderr)
 
         # RA External Match
         try:
@@ -399,9 +404,10 @@ def run_finalize(job_id: str):
                                     "similarity": round(r.get("score", 0), 2)})
             state["external_matches"] = matches
         except Exception:
-            import traceback, sys
-            print("ERROR in outline/paraphrase:", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            import sys as _sys
+            import traceback as _tb
+            print("ERROR in outline/paraphrase:", file=_sys.stderr)
+            _tb.print_exc(file=_sys.stderr)
 
         # RA Disclose
         try:
@@ -512,7 +518,8 @@ def revert_section(job_id: str, section_key: str) -> dict:
     if len(versions) >= 10:
         history[section_key] = versions[-10:]
 
-    from agentic.section_parser import rebuild_draft as _rebuild, update_section as _update
+    from agentic.section_parser import rebuild_draft as _rebuild
+    from agentic.section_parser import update_section as _update
     _update(sections, section_key, old_content)
     new_draft = _rebuild(sections)
     new_sections = parse_sections(new_draft)
@@ -591,9 +598,16 @@ def _find_section(sections: list[dict], key: str) -> dict | None:
 
 def _parse_structured_fig(draft: str, figures_dir: Path, start_idx: int) -> tuple[list[dict], int]:
     """Parse [FIG type|title|cats|series] placeholders and render charts."""
-    import json, re
+    import json
+    import re
+
     from agentic.mcp_servers.chart_server import (
-        bar_chart, grouped_bar_chart, line_chart, pie_chart, radar_chart, timeline_chart,
+        bar_chart,
+        grouped_bar_chart,
+        line_chart,
+        pie_chart,
+        radar_chart,
+        timeline_chart,
     )
     figures = []
     idx = start_idx
@@ -624,8 +638,8 @@ def _parse_structured_fig(draft: str, figures_dir: Path, start_idx: int) -> tupl
             elif ftype == "pie":
                 segments = []
                 for s in series_str.split(","):
-                    l, v = s.rsplit(":", 1)
-                    segments.append({"label": l.strip(), "value": float(v.strip())})
+                    label, val = s.rsplit(":", 1)
+                    segments.append({"label": label.strip(), "value": float(val.strip())})
                 pie_chart(json.dumps({"segments": segments}), title=title, output=path, theme="scientific")
             elif ftype in ("radar",):
                 series = []
@@ -636,26 +650,33 @@ def _parse_structured_fig(draft: str, figures_dir: Path, start_idx: int) -> tupl
             elif ftype == "timeline":
                 events = []
                 for e in series_str.split("|"):
-                    d, l = e.split(":", 1)
-                    events.append({"date": d.strip(), "label": l.strip()})
+                    date, label_text = e.split(":", 1)
+                    events.append({"date": date.strip(), "label": label_text.strip()})
                 timeline_chart(json.dumps({"events": events}), title=title, output=path, theme="scientific")
             else:
-                idx -= 1; continue
+                idx -= 1
+                continue
             figures.append({"index": idx - 1, "title": title, "png_path": path})
         except Exception:
-            import traceback, sys
-            print("ERROR in outline/paraphrase:", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            import sys as _sys
+            import traceback as _tb
+            print("ERROR in outline/paraphrase:", file=_sys.stderr)
+            _tb.print_exc(file=_sys.stderr)
             idx -= 1
     return figures, idx
 
 
 def _generate_figures(state: dict, figures_dir: Path) -> list[dict]:
     """Generate charts from structured [FIG ...] or legacy [FIGURE: ...] placeholders."""
-    import json, re
+    import json
+    import re
+
     from agentic.bridge import call_agent
     from agentic.mcp_servers.chart_server import (
-        bar_chart, grouped_bar_chart, line_chart, pie_chart, radar_chart, timeline_chart,
+        bar_chart,
+        grouped_bar_chart,
+        line_chart,
+        pie_chart,
     )
     draft = state.get("draft", "")
 
@@ -697,11 +718,13 @@ Use ONLY numbers from the data. JSON only."""
                     figures.append({"index": idx, "title": title, "png_path": path})
                     idx += 1
                 except Exception:
-                    import traceback; traceback.print_exc()
+                    import traceback as _tb2
+            _tb2.print_exc()
         except Exception:
-            import traceback, sys
-            print("ERROR in outline/paraphrase:", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            import sys as _sys
+            import traceback as _tb
+            print("ERROR in outline/paraphrase:", file=_sys.stderr)
+            _tb.print_exc(file=_sys.stderr)
     return figures
 
 
