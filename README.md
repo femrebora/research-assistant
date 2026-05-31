@@ -75,57 +75,86 @@ source ~/.bashrc
 ra
 ```
 
-That's it. Your browser opens at `http://127.0.0.1:5050`.
+Your browser opens at `http://127.0.0.1:5050`.
 
-The setup script creates a Python virtual environment, installs the package, creates a `.env` file, and prepares default research folders. The install script adds the `ra` command and `research-assistant` command to your shell.
+The setup script creates a Python virtual environment, installs the package, creates a `.env` file, and prepares default research folders. The install script adds the `ra` command to your shell.
 
-### Daily workflow
-
-Start or reopen:
+### Start and stop
 
 ```bash
-ra
+ra          # Start the app, or reopen the browser if already running
+ra stop     # Stop the background server
 ```
 
-Stop:
+Closing the browser or terminal does **not** stop the app — it keeps running in the background. After restarting your computer, just type `ra` again.
+
+If something is wrong, run `ra doctor` for a full diagnostic report.
+
+### How the shell configuration works
+
+The installer (`scripts/install_cli.sh`) adds two lines to your `~/.bashrc`. If you prefer to set them up by hand, here is exactly what they are and how to add them:
+
+**1. Add `~/.local/bin` to your PATH** — so the `research-assistant` command can be found:
 
 ```bash
-ra stop
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-**The simple rule:** Type `ra` to start or reopen. Type `ra stop` to stop.
-
-- Closing the browser does **not** stop the app.
-- Closing the terminal does **not** stop the app (it runs in the background).
-- After restarting your computer, just type `ra` again.
-- If the app is already running, `ra` simply reopens your browser.
-
-Alternative full command:
+**2. Add the `ra` alias** — so you can type `ra` instead of `research-assistant`:
 
 ```bash
-research-assistant
-research-assistant stop
+alias ra="research-assistant"
 ```
 
-Advanced commands (not needed for daily use):
+#### To add them manually
+
+Open your shell config file with a text editor:
 
 ```bash
-research-assistant restart     # Stop and start again
-research-assistant status      # Show server status
-research-assistant logs        # View recent logs
-research-assistant logs -f     # Follow logs live
-research-assistant doctor      # Run system diagnostics
-research-assistant open        # Open browser (server not required)
-research-assistant config      # Show configuration paths
+nano ~/.bashrc
 ```
 
-If something is wrong, run:
+Paste the two lines above at the end, then save (`Ctrl+O`) and exit (`Ctrl+X`). Finally, reload:
 
 ```bash
-research-assistant doctor
+source ~/.bashrc
 ```
+
+#### If you use a different shell
+
+| Shell | Config file | Notes |
+|---|---|---|
+| Bash | `~/.bashrc` | Most Linux defaults |
+| Zsh | `~/.zshrc` | macOS default |
+| Fish | `~/.config/fish/config.fish` | Uses different syntax — see [Fish docs](https://fishshell.com/docs/current/tutorial.html#path) |
+
+For Fish, the PATH line is different:
+
+```fish
+fish_add_path ~/.local/bin
+```
+
+But the alias (`alias ra="research-assistant"`) works the same.
+
+### Reference: all commands
+
+```bash
+ra                  # Start or reopen (the only command you need daily)
+ra stop             # Stop the background server
+ra restart          # Stop and start again
+ra status           # Show whether the server is running
+ra logs             # View recent server logs
+ra logs -f          # Follow logs live (Ctrl+C to exit)
+ra doctor           # Run system diagnostics
+ra open             # Open the browser (don't start server)
+ra config           # Show configuration file paths
+```
+
+These commands also work with the full name `research-assistant` (e.g. `research-assistant doctor`) if you prefer.
 
 ### npm users
+
+If you prefer npm over the shell scripts:
 
 ```bash
 npm run setup       # First time setup
@@ -136,7 +165,7 @@ npm run status      # Server status
 npm run doctor      # Diagnostics
 ```
 
-Default locations:
+## Default locations
 
 <table>
   <thead>
@@ -533,7 +562,7 @@ For sensitive work, use encrypted storage or a private backup location.
   <tbody>
     <tr>
       <td>The <code>ra</code> command is not found</td>
-      <td>Run <code>bash scripts/install_cli.sh</code> then <code>source ~/.bashrc</code>. Make sure <code>~/.local/bin</code> is in your PATH.</td>
+      <td>Run <code>bash scripts/install_cli.sh</code> then <code>source ~/.bashrc</code>. Or see <a href="#how-the-shell-configuration-works">How the shell configuration works</a> to add the PATH and alias by hand with <code>nano ~/.bashrc</code>.</td>
     </tr>
     <tr>
       <td>The Web UI does not start</td>
