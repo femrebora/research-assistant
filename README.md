@@ -263,36 +263,106 @@ Open the Web UI and complete these steps in order:
 
 ## Configuration
 
-You can configure the app from the browser:
+**You do not need every key.** One working model provider is enough to start. All others are optional.
+
+### Quick setup (30 seconds)
+
+```bash
+cp env.example .env
+# Edit .env with your editor — add at least one API key:
+nano .env
+```
+
+Then start the app and open `/settings` to configure the rest from the browser:
 
 ```text
 http://127.0.0.1:5050/settings
 ```
 
-Or edit `.env` manually:
+### Two ways to configure
+
+| Method | Best for |
+|--------|----------|
+| **Web UI** (`/settings`) | Paths, CLI commands, timeouts, checking what's configured |
+| **Edit `.env` directly** | API keys (never shown in browser), bulk edits, initial setup |
+
+Changes to paths, CLI commands, and timeouts take effect after restarting the app. API keys are read at startup.
+
+### Complete variable reference
+
+#### Required — at least one
+
+| Variable | What it does | Where used |
+|----------|-------------|------------|
+| `ANTHROPIC_API_KEY` | Claude models via Anthropic API | Ask, Compare, Writing tools, PaperForge |
+| `GEMINI_API_KEY` | Gemini models via Google API | Ask, Compare, Writing tools, PaperForge |
+| `DEEPSEEK_API_KEY` | DeepSeek models | Ask, Compare, Writing tools, PaperForge |
+| `OPENAI_API_KEY` | GPT models via OpenAI API | Ask, Compare, Writing tools, PaperForge |
+
+#### Paths
+
+| Variable | Default | What it does |
+|----------|---------|-------------|
+| `THESIS_ROOT` | `~/thesis` | Main workspace. Logs, sessions, index, exports, and project files are stored here. |
+| `ZOTERO_STORAGE` | _(none)_ | Path to Zotero's local storage folder containing PDF attachments. Required for indexing and RAG. |
+| `THESIS_DOCS` | Falls back to `THESIS_ROOT` | Additional folder of PDFs included in library searches. |
+
+**Examples:**
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...
-GEMINI_API_KEY=...
-DEEPSEEK_API_KEY=sk-...
-OPENAI_API_KEY=sk-...
-
-ZOTERO_USER_ID=1234567
-ZOTERO_API_KEY=...
-THESIS_ROOT=/home/you/thesis
-ZOTERO_STORAGE=/home/you/Zotero/storage
-
-SEMANTIC_SCHOLAR_API_KEY=
-ELICIT_API_KEY=
-
-CLAUDE_CLI_CMD="claude -p"
-GEMINI_CLI_CMD="gemini -p"
-CODEX_CLI_CMD="codex exec"
-OLLAMA_CLI_CMD="ollama run llama3.3"
-CLI_TIMEOUT=600
+THESIS_ROOT=/home/username/thesis
+ZOTERO_STORAGE=/home/username/Zotero/storage
 ```
 
-Model aliases can be changed without editing source code:
+#### Zotero
+
+| Variable | What it does | Required for |
+|----------|-------------|-------------|
+| `ZOTERO_STORAGE` | Path to local Zotero PDF attachments | PDF indexing, RAG, and citation-aware Q&A |
+| `ZOTERO_USER_ID` | Numeric user ID from zotero.org/settings/keys | Zotero API metadata search and library browsing |
+| `ZOTERO_API_KEY` | API key with read access to your Zotero library | Zotero API metadata search and library browsing |
+
+Get your credentials at **[https://www.zotero.org/settings/keys](https://www.zotero.org/settings/keys)**.
+
+**Note:** `ZOTERO_STORAGE` must point to the folder that *contains* the randomly-named subfolders (e.g., `~/Zotero/storage/`), not to one of those subfolders. The typical structure looks like:
+
+```text
+~/Zotero/storage/
+├── 2J4IK64G/
+│   └── paper.pdf
+├── 5TFZ9E85/
+│   └── another-paper.pdf
+└── ...
+```
+
+#### Paper Discovery
+
+| Variable | What it does | Required? |
+|----------|-------------|-----------|
+| `OPENALEX_EMAIL` | Email for OpenAlex polite pool (higher rate limits) | No — OpenAlex works without it |
+| `SEMANTIC_SCHOLAR_API_KEY` | API key for higher rate limits on Semantic Scholar | No — works without key at lower limits |
+| `ELICIT_API_KEY` | API key for Elicit searches | Yes for Elicit — requires a paid plan |
+| `BRAVE_API_KEY` | Web search via Brave Search API (2,000 free queries/month) | No — used by agentic pipeline |
+
+#### CLI-routed providers
+
+| Variable | Default | What it does |
+|----------|---------|-------------|
+| `CLAUDE_CLI_CMD` | `claude -p` | Command for the `claude-cli` model alias |
+| `GEMINI_CLI_CMD` | `gemini -p` | Command for the `gemini-cli` model alias |
+| `CODEX_CLI_CMD` | `codex exec` | Command for the `codex-cli` model alias |
+| `OLLAMA_CLI_CMD` | `ollama run llama3.3` | Command for the `ollama-cli` model alias |
+| `CLI_TIMEOUT` | `600` | Seconds before a CLI model call is killed |
+
+#### Local models (Ollama)
+
+| Variable | Default | What it does |
+|----------|---------|-------------|
+| `OLLAMA_MODEL` | `ollama/llama3.3` | Model string for the `local` alias (LiteLLM-managed API calls) |
+
+#### Model alias overrides
+
+Override the LiteLLM model string for any alias without editing source code:
 
 ```bash
 RA_MODEL_CLAUDE=anthropic/claude-opus-4-8
@@ -301,22 +371,355 @@ RA_MODEL_GPT=openai/gpt-5
 RA_MODEL_GEMINI=gemini/gemini-2.5-pro
 RA_MODEL_FLASH=gemini/gemini-2.5-flash
 RA_MODEL_LOCAL=ollama/llama3.3
+RA_MODEL_DEEPSEEK=deepseek/deepseek-chat
 ```
 
-Pattern:
+Pattern: `RA_MODEL_<ALIAS>=provider/model-name` (uppercase, hyphens become underscores).
 
-```text
-RA_MODEL_<ALIAS>=provider/model-name
+#### Web UI
+
+| Variable | Default | What it does |
+|----------|---------|-------------|
+| `RA_HOST` | `127.0.0.1` | Host the Flask app listens on |
+| `RA_PORT` | `5050` | Port the Flask app listens on |
+| `RA_BROWSER` | `xdg-open` | Browser command used by `ra open` |
+| `FLASK_SECRET_KEY` | Auto-generated | Flask session encryption. Set a fixed value to keep sessions across restarts. |
+| `FLASK_DEBUG` | `0` | Set to `1` for hot reload and detailed errors |
+
+#### Miscellaneous
+
+| Variable | Default | What it does |
+|----------|---------|-------------|
+| `EDITOR` | Falls back to `VISUAL`, then `nano` | Text editor for interactive review loops |
+| `ANTHROPIC_AUTH_TOKEN` | Falls back to `ANTHROPIC_API_KEY` | Alternative auth token for Anthropic API |
+| `CONTACT_EMAIL` | Falls back to `OPENALEX_EMAIL` | Contact email for external verification tools |
+| `SERPAPI_API_KEY` | _(none)_ | Web search via SerpAPI (alternative to Brave) |
+| `EMBEDDING_MODEL` | `openai/text-embedding-3-small` | Embedding model for vector index. Set to `ollama/nomic-embed-text` for local. |
+| `RA_ENV_FILE` | Auto-detected `.env` | Override path to the `.env` file |
+
+#### PaperForge Server
+
+| Variable | Default | What it does |
+|----------|---------|-------------|
+| `PF_HOST` | `127.0.0.1` | Host for the PaperForge sub-app |
+| `PF_PORT` | `5055` | Port for the PaperForge sub-app |
+
+### Settings page reference
+
+The `/settings` page shows two sections:
+
+1. **API keys & secrets** — green "set" or grey "not set" pills. Values are NEVER shown or editable in the browser.
+2. **Editable config** — paths, CLI commands, timeouts. You can edit and save these from the browser.
+
+The following can be checked or edited from `/settings`:
+
+| Setting | Visible at `/settings`? | Editable at `/settings`? |
+|---------|------------------------|--------------------------|
+| `ANTHROPIC_API_KEY` | ✓ (set/not-set pill) | ✗ (edit in `.env`) |
+| `GEMINI_API_KEY` | ✓ (set/not-set pill) | ✗ (edit in `.env`) |
+| `DEEPSEEK_API_KEY` | ✓ (set/not-set pill) | ✗ (edit in `.env`) |
+| `OPENAI_API_KEY` | ✓ (set/not-set pill) | ✗ (edit in `.env`) |
+| `ZOTERO_API_KEY` | ✓ (set/not-set pill) | ✗ (edit in `.env`) |
+| `SEMANTIC_SCHOLAR_API_KEY` | ✓ (set/not-set pill) | ✓ (edit and save) |
+| `ELICIT_API_KEY` | ✓ (set/not-set pill) | ✓ (edit and save) |
+| `BRAVE_API_KEY` | ✓ (set/not-set pill) | ✓ (edit and save) |
+| `FLASK_SECRET_KEY` | ✓ (set/not-set pill) | ✗ (edit in `.env`) |
+| `THESIS_ROOT` | ✓ (current value) | ✓ (edit and save) |
+| `ZOTERO_STORAGE` | ✓ (current value) | ✓ (edit and save) |
+| `THESIS_DOCS` | ✓ (current value) | ✓ (edit and save) |
+| `ZOTERO_USER_ID` | ✓ (current value) | ✓ (edit and save) |
+| `OPENALEX_EMAIL` | ✓ (current value) | ✓ (edit and save) |
+| `CLAUDE_CLI_CMD` | ✓ (current value) | ✓ (edit and save) |
+| `GEMINI_CLI_CMD` | ✓ (current value) | ✓ (edit and save) |
+| `CODEX_CLI_CMD` | ✓ (current value) | ✓ (edit and save) |
+| `OLLAMA_CLI_CMD` | ✓ (current value) | ✓ (edit and save) |
+| `OLLAMA_MODEL` | ✓ (current value) | ✓ (edit and save) |
+| `CLI_TIMEOUT` | ✓ (current value) | ✓ (edit and save) |
+| `RA_HOST` | ✓ (current value) | ✓ (edit and save) |
+| `RA_PORT` | ✓ (current value) | ✓ (edit and save) |
+| `RA_BROWSER` | ✓ (current value) | ✓ (edit and save) |
+| `FLASK_DEBUG` | ✓ (current value) | ✓ (edit and save) |
+| `EMBEDDING_MODEL` | ✓ (current value) | ✓ (edit and save) |
+| `CONTACT_EMAIL` | ✓ (set/not-set pill) | ✓ (edit and save) |
+| `EDITOR` | ✓ (current value) | ✓ (edit and save) |
+
+## First time configuration
+
+Follow these steps in order. Each step takes about 1–2 minutes.
+
+### Step 1: Clone and set up
+
+```bash
+git clone https://github.com/femrebora/research-assistant.git
+cd research-assistant
+bash scripts/setup.sh
+bash scripts/install_cli.sh
 ```
 
-Examples:
+The setup script creates a Python virtual environment at `~/.venvs/thesis`, installs the package, and creates placeholder directories. The CLI installer adds the `research-assistant` wrapper to `~/.local/bin/`.
 
-```text
-RA_MODEL_GPT
-RA_MODEL_GEMINI
-RA_MODEL_DEEPSEEK
-RA_MODEL_LOCAL
+### Step 2: Copy and edit the environment file
+
+```bash
+cp env.example .env
 ```
+
+Edit `.env` with your editor. Add at least one model provider API key:
+
+```bash
+# Choose at least one:
+ANTHROPIC_API_KEY=sk-ant-your-real-key-here
+# or
+GEMINI_API_KEY=your-real-gemini-key
+# or
+DEEPSEEK_API_KEY=sk-your-real-deepseek-key
+# or
+OPENAI_API_KEY=sk-your-real-openai-key
+```
+
+**Never commit `.env` to git.** It is already in `.gitignore`.
+
+### Step 3: Add Zotero settings (if you want citation-aware Q&A)
+
+If you use Zotero, add these to `.env`:
+
+```bash
+ZOTERO_STORAGE=/home/username/Zotero/storage
+ZOTERO_USER_ID=1234567
+ZOTERO_API_KEY=your-zotero-api-key
+```
+
+- Find your user ID and create an API key at **[zotero.org/settings/keys](https://www.zotero.org/settings/keys)**
+- `ZOTERO_STORAGE` must point to the folder containing your PDF attachment subfolders
+
+### Step 4: Start the Web UI
+
+```bash
+research-assistant
+```
+
+The browser opens at `http://127.0.0.1:5050`.
+
+### Step 5: Open `/settings`
+
+Check that your API keys show as green "set" pills. Set your thesis workspace path and Zotero storage path. Save changes, then restart:
+
+```bash
+research-assistant restart
+```
+
+### Step 6: Open `/providers` and test
+
+Test each model alias you plan to use. A green ✓ means the provider works. A red ✗ shows the error message — common fixes are in the troubleshooting section below.
+
+### Step 7: Open `/index-setup` and index Zotero PDFs
+
+The 6-step wizard walks you through: workspace → Zotero storage → credentials → scan → index → test. After indexing, your PDFs are searchable via Ask Library.
+
+### Step 8: Start working
+
+- **Ask Library** (`/ask-library`) — Ask cited questions over your indexed papers
+- **Writing Studio** (`/writing-studio`) — Outline, draft, critique, paraphrase
+- **Paper Discovery** (`/paper-discovery`) — Search for papers beyond your Zotero library
+- **Workspace** (`/workspace`) — Edit project documents with AI assistance
+- **PaperForge** (`/paperforge`) — Multi-agent paper drafting workflow
+
+## Tool integration guide
+
+Each tool or provider is documented below with setup instructions, testing steps, and common problems.
+
+### Claude API
+
+| | |
+|---|---|
+| **What it does** | Powers the `claude`, `sonnet`, and `haiku` model aliases via the Anthropic API. |
+| **Env vars needed** | `ANTHROPIC_API_KEY` (required) |
+| **Required?** | No — at least one model provider is needed, but it does not have to be Claude. |
+| **How to test** | Open `/providers`, click **Test** next to `claude` or `sonnet`. |
+| **Common problems** | Key does not start with `sk-ant-` → you may have copied an organizational key instead of a personal one. 403 error → key does not have the right permissions. Rate limit → wait and retry later. |
+
+### Claude CLI
+
+| | |
+|---|---|
+| **What it does** | Routes prompts through the `claude` CLI binary instead of the API. |
+| **Env vars needed** | `CLAUDE_CLI_CMD` (default: `claude -p`) |
+| **Required?** | No — only if you want to use the `claude-cli` alias. |
+| **How to test** | Open `/providers`, click **Test** next to `claude-cli`. |
+| **Common problems** | `claude: command not found` → install Claude Code CLI or check your PATH. CLI timeout → increase `CLI_TIMEOUT` in `/settings`. |
+
+### OpenAI
+
+| | |
+|---|---|
+| **What it does** | Powers the `gpt` and `gpt-mini` model aliases via the OpenAI API. |
+| **Env vars needed** | `OPENAI_API_KEY` (required) |
+| **Required?** | No — at least one model provider is needed. |
+| **How to test** | Open `/providers`, click **Test** next to `gpt`. |
+| **Common problems** | Key does not start with `sk-` → check you copied the full key. Insufficient quota → check your OpenAI billing dashboard. |
+
+### Gemini
+
+| | |
+|---|---|
+| **What it does** | Powers the `gemini` and `flash` model aliases via the Google Gemini API. |
+| **Env vars needed** | `GEMINI_API_KEY` (required) |
+| **Required?** | No — at least one model provider is needed. |
+| **How to test** | Open `/providers`, click **Test** next to `gemini`. |
+| **Common problems** | Key not authorized for Gemini API → enable it in Google AI Studio. 429 rate limit → wait and retry. |
+
+### DeepSeek
+
+| | |
+|---|---|
+| **What it does** | Powers the `deepseek` model alias. |
+| **Env vars needed** | `DEEPSEEK_API_KEY` (required) |
+| **Required?** | No — at least one model provider is needed. |
+| **How to test** | Open `/providers`, click **Test** next to `deepseek`. |
+| **Common problems** | Key not valid → generate a new one in the DeepSeek dashboard. |
+
+### Ollama (local models)
+
+| | |
+|---|---|
+| **What it does** | Runs models locally through Ollama, both via API (`local` alias) and CLI passthrough (`ollama-cli`). |
+| **Env vars needed** | `OLLAMA_MODEL` (default: `ollama/llama3.3`), `OLLAMA_CLI_CMD` (default: `ollama run llama3.3`) |
+| **Required?** | No — only if you want to use local models. |
+| **How to test** | Open `/providers`, click **Test** next to `local` or `ollama-cli`. Make sure Ollama is running: `ollama serve`. |
+| **Common problems** | `Connection refused` → Ollama is not running. Start it with `ollama serve`. Model not found → pull it first: `ollama pull llama3.3`. |
+
+### Zotero
+
+| | |
+|---|---|
+| **What it does** | Indexes your local Zotero PDFs for retrieval-augmented Q&A, searches metadata via the Zotero API, and enables citation-aware responses. |
+| **Env vars needed** | `ZOTERO_STORAGE` (required for indexing), `ZOTERO_USER_ID` + `ZOTERO_API_KEY` (required for API metadata search) |
+| **Required?** | No — the app works without Zotero, but Ask Library, Evidence, and Claim Verify are more powerful with it. |
+| **How to test** | Open `/index-setup` and step through the wizard. The storage scan shows how many PDFs were found. Open `/library-search` and run a query. Use the **Test Zotero API** button in `/settings` or the index setup wizard. |
+| **Common problems** | Zero PDFs found → `ZOTERO_STORAGE` points to the wrong folder. It must be the `storage/` folder containing the random subfolders, not a single paper folder. API key not working → check it has read access and the user ID is numeric. |
+
+### Elicit
+
+| | |
+|---|---|
+| **What it does** | Searches Elicit for papers via the Paper Discovery page. |
+| **Env vars needed** | `ELICIT_API_KEY` (required) |
+| **Required?** | No — and requires a paid Elicit plan. |
+| **How to test** | Open `/paper-discovery`, select Elicit, and run a search. |
+| **Common problems** | 401 error → API key is missing or invalid. 402 error → paid plan required. |
+
+### Semantic Scholar
+
+| | |
+|---|---|
+| **What it does** | Searches Semantic Scholar for papers via the Paper Discovery page. |
+| **Env vars needed** | `SEMANTIC_SCHOLAR_API_KEY` (optional — works without a key at lower rate limits) |
+| **Required?** | No. |
+| **How to test** | Open `/paper-discovery`, select Semantic Scholar, and run a search. |
+| **Common problems** | Rate limited → add a free API key from semanticscholar.org/product/api for higher limits. |
+
+### OpenAlex
+
+| | |
+|---|---|
+| **What it does** | Searches OpenAlex for papers via the Paper Discovery page. Always available — no key required. |
+| **Env vars needed** | `OPENALEX_EMAIL` (optional — adds you to the polite pool for higher rate limits) |
+| **Required?** | No — OpenAlex works without any configuration. |
+| **How to test** | Open `/paper-discovery`, select OpenAlex, and run a search. |
+| **Common problems** | Rate limited → add your email to `OPENALEX_EMAIL` for the polite pool. |
+
+### Brave Search
+
+| | |
+|---|---|
+| **What it does** | Web search via Brave Search API. Used by the agentic pipeline for literature research. |
+| **Env vars needed** | `BRAVE_API_KEY` (required for this feature) |
+| **Required?** | No — only used by the agentic pipeline. |
+| **How to test** | The agentic pipeline will report `BRAVE_API_KEY not set` if not configured. Set the key and re-run. |
+| **Common problems** | Free tier limit (2,000/month) exceeded → upgrade or wait until next month. |
+
+### PaperForge
+
+| | |
+|---|---|
+| **What it does** | Multi-agent workflow for generating academic paper drafts from a topic or codebase. |
+| **Env vars needed** | Uses the same model provider keys listed above (Anthropic, Gemini, etc.). No additional keys required. Available at `/paperforge` when the agentic pipeline package is installed. |
+| **Required?** | No. |
+| **How to test** | Open `/paperforge`, enter a topic, and generate an outline. |
+
+### AI usage disclosure
+
+| | |
+|---|---|
+| **What it does** | Logs model usage to `~/thesis/logs/YYYY-MM-DD.jsonl` and generates AI-use disclosure statements. |
+| **Env vars needed** | None — logs are written automatically. |
+| **Required?** | No — but strongly recommended if your institution requires AI disclosure. |
+| **How to test** | Run `ra-disclose` from the terminal or open `/disclosure` in the Web UI. |
+
+### Local workspace paths
+
+| | |
+|---|---|
+| **What it does** | Defines where your thesis projects, drafts, logs, sessions, indexes, and exports live. |
+| **Env vars needed** | `THESIS_ROOT` (default: `~/thesis`), `THESIS_DOCS` (optional) |
+| **Required?** | `THESIS_ROOT` is strongly recommended. It defaults to `~/thesis` if not set. |
+| **How to test** | Open `/settings` — the resolved path is shown with a ✓ (exists) or ⚠ (not found) status pill. |
+| **Common problems** | Path was moved or deleted → update `THESIS_ROOT` in `/settings` and restart. |
+
+## Troubleshooting
+
+### Installation and startup
+
+| Problem | Fix |
+|---------|-----|
+| `research-assistant` is not found | Run `bash scripts/install_cli.sh`. Make sure `~/.local/bin` is in your `PATH`. |
+| `ra` is not found | Add `alias ra="research-assistant"` to `~/.bashrc` or use the full command. |
+| Project directory not found | The repo was moved or deleted after installing the wrapper. Reinstall from the new repo path with `bash scripts/install_cli.sh`. |
+| Web UI does not start | Run `research-assistant doctor`, then check logs with `research-assistant logs`. |
+| Port 5050 is already in use | Run `research-assistant restart` or start with another port: `RA_PORT=5051 research-assistant`. |
+
+### API keys and providers
+
+| Problem | Fix |
+|---------|-----|
+| API key is missing | Open `/settings` to see which keys are set. Add missing keys to `.env` and restart. |
+| Provider test fails | Open `/providers`, click **Test**, read the error message. Check key validity on the provider's dashboard. |
+| Claude CLI is installed but not detected | Verify with `which claude`. Check that `CLAUDE_CLI_CMD` matches the actual binary. The default is `claude -p`. |
+| `.env` changes do not apply | Restart the app: `research-assistant restart`. Path and timeout changes are read at startup. |
+| The Web UI shows an old setting | After saving in `/settings`, restart the app for path and CLI changes. API keys always require restart. |
+| Rate limit errors | Wait and retry. Add API keys (Semantic Scholar, OpenAlex email) for higher rate limits. |
+
+### Zotero
+
+| Problem | Fix |
+|---------|-----|
+| Zotero path has zero PDFs | `ZOTERO_STORAGE` must point to the `storage/` folder *containing* the random subfolders, not to a subfolder itself. On Linux this is typically `~/Zotero/storage`. Run `research-assistant doctor` to see diagnostics. |
+| Zotero API returns no results | Check that `ZOTERO_USER_ID` is numeric and `ZOTERO_API_KEY` has read access. Use the **Test Zotero API** button in `/settings`. |
+| Zotero storage path was moved | Update `ZOTERO_STORAGE` in `/settings` or `.env`, then restart the app. |
+
+### Paper discovery
+
+| Problem | Fix |
+|---------|-----|
+| Elicit is not configured | Set `ELICIT_API_KEY` in `.env` or from `/settings`. Elicit requires a paid plan. |
+| Paper discovery returns no results | Try a different source (OpenAlex works without any key). Broaden your search query. Check your internet connection. |
+| Semantic Scholar rate limited | Add a free API key to `SEMANTIC_SCHOLAR_API_KEY`. Get one at semanticscholar.org/product/api. |
+
+### Paths and workspace
+
+| Problem | Fix |
+|---------|-----|
+| `THESIS_ROOT` path does not exist | Create it: `mkdir -p ~/thesis`. Or set a different path in `/settings`. |
+| A path was moved or deleted | Update the path in `/settings` or `.env` and restart the app. |
+| Workspace folder is empty | Workspace folders are created the first time you use a feature (e.g., `/workspace`, `/projects`). |
+
+### Safety
+
+| Problem | Prevention |
+|---------|-----------|
+| Accidentally committing API keys | `.env` is gitignored. Check `git status` before committing. Never add `.env` to the repo. |
+| Accidentally committing private research data | Keep thesis PDFs, drafts, and logs outside the repository folder. They belong in `THESIS_ROOT` (default `~/thesis`). |
+| Accidentally committing Zotero PDFs | The Zotero storage folder should be outside the repository. Never add it to git.
 
 ## Default locations
 
@@ -825,59 +1228,6 @@ tar -czf thesis-backup-$(date +%Y%m%d).tar.gz ~/thesis
 ```
 
 For sensitive research, use encrypted storage or a trusted private backup location.
-
-## Troubleshooting
-
-<table>
-  <thead>
-    <tr>
-      <th>Problem</th>
-      <th>Fix</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>research-assistant</code> is not found</td>
-      <td>Run <code>bash scripts/install_cli.sh</code>. Make sure <code>~/.local/bin</code> is in your <code>PATH</code>.</td>
-    </tr>
-    <tr>
-      <td><code>ra</code> is not found</td>
-      <td>Add <code>alias ra="research-assistant"</code> to <code>~/.bashrc</code> or use the full command.</td>
-    </tr>
-    <tr>
-      <td>Project directory not found</td>
-      <td>The repo was moved or deleted after installing the wrapper. Reinstall from the new repo path with <code>bash scripts/install_cli.sh</code>.</td>
-    </tr>
-    <tr>
-      <td>Web UI does not start</td>
-      <td>Run <code>research-assistant doctor</code>, then check logs with <code>research-assistant logs</code>.</td>
-    </tr>
-    <tr>
-      <td>Port 5050 is already in use</td>
-      <td>Run <code>research-assistant restart</code> or start with another port: <code>RA_PORT=5051 research-assistant</code>.</td>
-    </tr>
-    <tr>
-      <td>Provider test fails</td>
-      <td>Open <code>/settings</code>, check the API key or CLI command, then test again from <code>/providers</code>.</td>
-    </tr>
-    <tr>
-      <td>Zotero indexing finds zero PDFs</td>
-      <td>Open <code>/index-setup</code> and check diagnostics. <code>ZOTERO_STORAGE</code> should point to the folder containing Zotero attachment subfolders.</td>
-    </tr>
-    <tr>
-      <td>Answers have weak citations</td>
-      <td>Index more relevant papers, ask a narrower question, or add stronger project keywords.</td>
-    </tr>
-    <tr>
-      <td>CLI provider times out</td>
-      <td>Increase <code>CLI_TIMEOUT</code> in <code>.env</code> or from <code>/settings</code>.</td>
-    </tr>
-    <tr>
-      <td>You cannot find previous work</td>
-      <td>Check <code>/sessions</code>, <code>/workspace</code>, <code>/projects</code>, <code>~/thesis/logs/</code>, and your project folder under <code>THESIS_ROOT</code>.</td>
-    </tr>
-  </tbody>
-</table>
 
 ## Updating
 

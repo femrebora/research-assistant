@@ -83,9 +83,16 @@ check_key() {
 if [ -f "$PROJECT_DIR/.env" ]; then
     set -a; source "$PROJECT_DIR/.env" 2>/dev/null || true; set +a
 fi
-for key in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN GEMINI_API_KEY DEEPSEEK_API_KEY OPENAI_API_KEY ZOTERO_API_KEY SEMANTIC_SCHOLAR_API_KEY ELICIT_API_KEY; do
+for key in ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN GEMINI_API_KEY DEEPSEEK_API_KEY OPENAI_API_KEY ZOTERO_API_KEY SEMANTIC_SCHOLAR_API_KEY ELICIT_API_KEY BRAVE_API_KEY SERPAPI_API_KEY FLASK_SECRET_KEY; do
     check_key "$key"
 done
+# OPENALEX_EMAIL is a semi-secret (not an API key, but used for rate-limit pools)
+OPENALEX_EMAIL="${OPENALEX_EMAIL:-}"
+if [ -n "$OPENALEX_EMAIL" ]; then
+    ok "OPENALEX_EMAIL: configured ($OPENALEX_EMAIL)"
+else
+    warn "OPENALEX_EMAIL: not configured"
+fi
 
 # ── Zotero storage ─────────────────────────────────────────────────────
 header "Zotero Storage"
@@ -170,6 +177,25 @@ elif command -v lsof &>/dev/null; then
     fi
 else
     info "Cannot check port status (ss/lsof not found)"
+fi
+
+# ── PaperForge Port ────────────────────────────────────────────────────
+header "PaperForge Port (${PF_PORT:-5055})"
+PF_PORT_VAL="${PF_PORT:-5055}"
+if command -v ss &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep -q ":${PF_PORT_VAL} "; then
+        ok "Port $PF_PORT_VAL is in use (PaperForge server running)"
+    else
+        info "Port $PF_PORT_VAL is available"
+    fi
+elif command -v lsof &>/dev/null; then
+    if lsof -i ":${PF_PORT_VAL}" -sTCP:LISTEN &>/dev/null; then
+        ok "Port $PF_PORT_VAL is in use (PaperForge server running)"
+    else
+        info "Port $PF_PORT_VAL is available"
+    fi
+else
+    info "Cannot check PaperForge port status (ss/lsof not found)"
 fi
 
 # ── Background process ─────────────────────────────────────────────────

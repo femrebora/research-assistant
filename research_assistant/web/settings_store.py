@@ -28,6 +28,8 @@ SECRET_KEYS: tuple[str, ...] = (
     "ZOTERO_API_KEY",
     "SEMANTIC_SCHOLAR_API_KEY",
     "ELICIT_API_KEY",
+    "BRAVE_API_KEY",
+    "SERPAPI_API_KEY",
     "FLASK_SECRET_KEY",
 )
 
@@ -36,6 +38,7 @@ SECRET_KEYS: tuple[str, ...] = (
 SEMI_SECRET_KEYS: tuple[str, ...] = (
     "OPENALEX_EMAIL",
     "ZOTERO_USER_ID",
+    "CONTACT_EMAIL",
 )
 
 
@@ -54,18 +57,35 @@ class EditableField:
 # Order here is the order rendered on the page.
 EDITABLE_FIELDS: tuple[EditableField, ...] = (
     EditableField("THESIS_ROOT", "Thesis root", "Paths", str(Path.home() / "thesis"),
-                  help="Where logs, sessions, and the index live."),
+                  help="Where logs, sessions, drafts, exports, and the index live."),
     EditableField("ZOTERO_STORAGE", "Zotero storage", "Paths", "",
                   help="Path to your Zotero/storage folder (PDF attachments)."),
+    EditableField("THESIS_DOCS", "Additional PDFs folder", "Paths", "",
+                  help="Extra folder of PDFs to include in library searches. Falls back to THESIS_ROOT if empty."),
+    # Web UI
+    EditableField("RA_HOST", "Web UI host", "Web UI", "127.0.0.1",
+                  help="Host the Flask app listens on. Change to 0.0.0.0 to expose on the network."),
+    EditableField("RA_PORT", "Web UI port", "Web UI", "5050", kind="number",
+                  help="Port the Flask app listens on."),
+    EditableField("RA_BROWSER", "Browser command", "Web UI", "xdg-open",
+                  help="Command used by `ra open`. macOS: open, Windows: start."),
+    EditableField("FLASK_DEBUG", "Debug mode", "Web UI", "0", kind="number",
+                  help="Set to 1 for hot reload and detailed error pages. Do not use in production."),
+    # Zotero
     EditableField("ZOTERO_USER_ID", "Zotero user ID", "Zotero", "",
                   help="Numeric user ID from zotero.org/settings/keys."),
-    # Paper discovery configuration
+    # Paper Discovery
     EditableField("OPENALEX_EMAIL", "OpenAlex email (optional)", "Paper Discovery", "",
                   help="Email for OpenAlex polite pool — improves rate limits. Not a secret."),
     EditableField("SEMANTIC_SCHOLAR_API_KEY", "Semantic Scholar API key (optional)", "Paper Discovery", "",
                   help="Increases rate limit for Semantic Scholar searches. Leave blank to use without key."),
     EditableField("ELICIT_API_KEY", "Elicit API key (optional)", "Paper Discovery", "",
                   help="Required for Elicit searches. Requires a paid plan."),
+    EditableField("BRAVE_API_KEY", "Brave Search API key (optional)", "Paper Discovery", "",
+                  help="Web search via Brave Search API. Free tier: 2,000 queries/month."),
+    # Vector Index
+    EditableField("EMBEDDING_MODEL", "Embedding model", "Vector Index", "openai/text-embedding-3-small",
+                  help="LiteLLM model string for embeddings. Default uses OpenAI; use ollama/nomic-embed-text for local."),
     # CLI providers
     EditableField("CLAUDE_CLI_CMD", "Claude CLI command", "CLI providers", "claude -p"),
     EditableField("GEMINI_CLI_CMD", "Gemini CLI command", "CLI providers", "gemini -p"),
@@ -74,8 +94,11 @@ EDITABLE_FIELDS: tuple[EditableField, ...] = (
     EditableField("OLLAMA_MODEL", "Ollama model (API)", "CLI providers", "ollama/llama3.3",
                   help="Model string used by the LiteLLM-managed `local` alias."),
     EditableField("CLI_TIMEOUT", "CLI timeout (seconds)", "CLI providers", "600", kind="number"),
+    # Misc
     EditableField("EDITOR", "Editor", "Misc", "",
-                  help="Used by interactive review loops (paraphrase/critic)."),
+                  help="Used by interactive review loops (paraphrase/critic). Falls back to VISUAL, then nano."),
+    EditableField("CONTACT_EMAIL", "Contact email", "Misc", "",
+                  help="Used by external verification tools. Falls back to OPENALEX_EMAIL."),
 )
 
 EDITABLE_KEYS: frozenset[str] = frozenset(f.key for f in EDITABLE_FIELDS)
@@ -95,11 +118,22 @@ def env_path() -> Path:
 
 
 def secret_status() -> list[dict]:
-    """Report which secret keys are configured, without revealing any value."""
-    return [
-        {"key": key, "configured": bool(os.getenv(key, "").strip())}
-        for key in SECRET_KEYS
-    ]
+    """Report which secret keys are configured, without revealing any value.
+
+    Includes both full secrets (SECRET_KEYS) and semi-secret keys
+    (SEMI_SECRET_KEYS — email addresses and user IDs that are not
+    themselves secrets but are still sensitive).
+    """
+    result: list[dict] = []
+    for key in SECRET_KEYS:
+        result.append(
+            {"key": key, "configured": bool(os.getenv(key, "").strip())}
+        )
+    for key in SEMI_SECRET_KEYS:
+        result.append(
+            {"key": key, "configured": bool(os.getenv(key, "").strip())}
+        )
+    return result
 
 
 def editable_values() -> list[dict]:
