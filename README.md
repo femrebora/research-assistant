@@ -1,65 +1,117 @@
 # research-assistant
 
-[![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python\&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-A3E635)](LICENSE)
-[![Web UI](https://img.shields.io/badge/web%20UI-Flask-000000?logo=flask\&logoColor=white)](https://flask.palletsprojects.com/)
-[![Models](https://img.shields.io/badge/models-Claude%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20GPT--5-7C3AED)](#supported-models)
+[![Web UI](https://img.shields.io/badge/web%20UI-Flask-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Zotero](https://img.shields.io/badge/Zotero-ready-CC2936?logo=zotero&logoColor=white)](https://www.zotero.org/)
+[![Models](https://img.shields.io/badge/models-Claude%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20GPT%20%7C%20Ollama-7C3AED)](#supported-models)
 
-**research-assistant** is a local first academic research workspace for thesis helper, literature review, citation-aware drafting, paper discovery, model comparison, and transparent AI assisted research workflows.
+**research-assistant** is a local first academic research workspace for thesis writing, literature review, Zotero based retrieval, citation aware drafting, model comparison, paper discovery, project organization, and transparent AI assisted research.
 
-It combines a Flask Web UI, Zotero-indexed retrieval, multi-model comparison, academic writing tools, AI usage disclosure logs, and PaperForge, a multi-agent paper drafting pipeline.
+It gives you one place to index your own papers, ask cited questions, compare multiple models, organize thesis or manuscript work, generate outlines, audit claims, prepare for defense questions, and keep AI usage logs for disclosure.
 
-The goal is to help researchers work with their own papers, ask better questions, compare model outputs, write more structured drafts, and keep AI-assisted research transparent.
+## Why this exists
+
+Academic AI tools are useful, but they often separate the work into too many places: papers in Zotero, notes in another app, prompts in a browser, drafts in a document editor, citations somewhere else, and AI usage logs nowhere.
+
+**research-assistant** is built to make that workflow more organized:
+
+<table>
+  <thead>
+    <tr>
+      <th>Problem</th>
+      <th>How research-assistant helps</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Your papers are scattered</td>
+      <td>Index local Zotero PDFs and ask questions over your own library.</td>
+    </tr>
+    <tr>
+      <td>AI answers are hard to trust</td>
+      <td>Use citation aware retrieval, claim verification, and citation auditing.</td>
+    </tr>
+    <tr>
+      <td>Different models give different answers</td>
+      <td>Compare Claude, Gemini, DeepSeek, GPT, Ollama, and CLI routed models.</td>
+    </tr>
+    <tr>
+      <td>Thesis work becomes messy</td>
+      <td>Keep projects, sessions, drafts, evidence, notes, logs, and exports in one workspace.</td>
+    </tr>
+    <tr>
+      <td>AI disclosure is easy to forget</td>
+      <td>Save model usage logs and generate disclosure text for thesis or manuscript workflows.</td>
+    </tr>
+  </tbody>
+</table>
 
 ## Main features
 
 <table>
   <thead>
     <tr>
-      <th>Feature area</th>
+      <th>Feature</th>
       <th>What it does</th>
+      <th>Best for</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><strong>Zotero RAG</strong></td>
-      <td>Indexes Zotero PDFs and lets you ask questions over your own academic library.</td>
+      <td>Indexes local Zotero PDFs and retrieves relevant paper chunks.</td>
+      <td>Evidence based questions over your own literature library.</td>
     </tr>
     <tr>
-      <td><strong>Literature Q&amp;A</strong></td>
-      <td>Generates citation-aware answers from indexed papers.</td>
-    </tr>
-    <tr>
-      <td><strong>Model comparison</strong></td>
-      <td>Sends the same research question to multiple models and compares their answers side by side.</td>
-    </tr>
-    <tr>
-      <td><strong>Academic writing tools</strong></td>
-      <td>Supports outlining, critique, paraphrase checking, coherence review, claim verification, and citation auditing.</td>
+      <td><strong>Ask Library</strong></td>
+      <td>Ask cited questions with RAG, ask without context, or compare models.</td>
+      <td>Daily thesis and literature review questions.</td>
     </tr>
     <tr>
       <td><strong>Paper discovery</strong></td>
-      <td>Finds related papers through external discovery sources such as OpenAlex and Semantic Scholar.</td>
+      <td>Search OpenAlex, Semantic Scholar, and Elicit when configured.</td>
+      <td>Finding new papers beyond your Zotero library.</td>
+    </tr>
+    <tr>
+      <td><strong>Writing Studio</strong></td>
+      <td>Generate paragraph angles, outlines, critiques, paraphrases, and coherence checks.</td>
+      <td>Academic drafting and revision.</td>
     </tr>
     <tr>
       <td><strong>Project workspace</strong></td>
-      <td>Stores project title, research question, hypothesis, keywords, citation style, and supervisor notes.</td>
+      <td>Stores project title, research question, hypothesis, keywords, citation style, discipline, and supervisor notes.</td>
+      <td>Keeping each thesis, manuscript, or review project separate.</td>
+    </tr>
+    <tr>
+      <td><strong>Workspace editor</strong></td>
+      <td>Edit project documents, apply AI assisted revisions, select source PDFs, and undo changes.</td>
+      <td>Continuing long writing work without losing context.</td>
     </tr>
     <tr>
       <td><strong>Peer review simulation</strong></td>
-      <td>Runs structural, methodological, and citation-focused review passes across multiple models.</td>
+      <td>Runs structural, methodological, and citation focused review passes.</td>
+      <td>Finding weaknesses before supervisor review or submission.</td>
     </tr>
     <tr>
       <td><strong>Defense preparation</strong></td>
-      <td>Generates thesis defense questions from multiple examiner personas.</td>
+      <td>Generates questions from different examiner personas.</td>
+      <td>Preparing for thesis defense and project presentations.</td>
+    </tr>
+    <tr>
+      <td><strong>Claim verification</strong></td>
+      <td>Checks whether draft claims are supported by retrieved evidence.</td>
+      <td>Reducing unsupported claims and citation mistakes.</td>
     </tr>
     <tr>
       <td><strong>PaperForge</strong></td>
-      <td>Creates academic paper drafts from a codebase or research topic using a multi-agent workflow.</td>
+      <td>Multi agent workflow for creating academic paper drafts from a topic or codebase.</td>
+      <td>Research software papers, review drafts, and structured manuscript prototypes.</td>
     </tr>
     <tr>
       <td><strong>AI disclosure</strong></td>
-      <td>Logs model usage and generates disclosure statements for thesis or manuscript workflows.</td>
+      <td>Logs model usage and helps generate transparent AI use statements.</td>
+      <td>Thesis, journal, conference, and institutional transparency requirements.</td>
     </tr>
   </tbody>
 </table>
@@ -67,113 +119,203 @@ The goal is to help researchers work with their own papers, ask better questions
 ## Quick start
 
 ```bash
-git clone https://github.com/femrebora/research-assistant
+git clone https://github.com/femrebora/research-assistant.git
 cd research-assistant
 bash scripts/setup.sh
 bash scripts/install_cli.sh
 research-assistant
 ```
 
-Your browser opens at `http://127.0.0.1:5050`.
+The Web UI opens at:
 
-The setup script creates a Python virtual environment, installs the package, creates a `.env` file, and prepares default research folders.
+```text
+http://127.0.0.1:5050
+```
 
-The install script copies a small wrapper to `~/.local/bin/research-assistant`. For the `ra` shortcut, add this line to your `~/.bashrc` (optional — the installer prints the exact line):
+The setup script creates a Python virtual environment, installs the package in editable mode, creates `.env` from `env.example`, and prepares default local folders.
+
+The CLI installer adds a `research-assistant` wrapper to:
+
+```text
+~/.local/bin/research-assistant
+```
+
+It does not modify your shell configuration automatically.
+
+## Daily commands
+
+After installation, this is usually all you need:
+
+```bash
+research-assistant          # Start the app or reopen it in the browser
+research-assistant stop     # Stop the background server
+research-assistant doctor   # Diagnose setup, paths, and common problems
+```
+
+Optional shortcut:
 
 ```bash
 alias ra="research-assistant"
 ```
 
-### Start and stop
+Then you can use:
 
 ```bash
-ra          # Start the app, or reopen the browser if already running
-ra stop     # Stop the background server
+ra
+ra stop
+ra doctor
 ```
 
-Closing the browser or terminal does **not** stop the app — it keeps running in the background. After restarting your computer, just type `ra` again.
-
-If something is wrong, run `ra doctor` for a full diagnostic report.
-
-### How the shell configuration works
-
-The installer (`scripts/install_cli.sh`) copies a wrapper script to `~/.local/bin/research-assistant`. It does **not** modify your `~/.bashrc` — you control your own shell configuration.
-
-To use the `ra` shortcut, add these two lines to your shell config by hand:
-
-**1. Add `~/.local/bin` to your PATH** — so the `research-assistant` command can be found:
+Full command reference:
 
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+research-assistant          # Start or reopen
+research-assistant stop     # Stop the background server
+research-assistant restart  # Stop and start again
+research-assistant status   # Show server status
+research-assistant logs     # Show recent logs
+research-assistant logs -f  # Follow logs live
+research-assistant doctor   # Run diagnostics
+research-assistant open     # Open browser without starting the server
+research-assistant config   # Show project, log, PID, env, and URL paths
 ```
 
-**2. Add the `ra` alias** — so you can type `ra` instead of `research-assistant`:
+## Requirements
+
+<table>
+  <thead>
+    <tr>
+      <th>Requirement</th>
+      <th>Why it is needed</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Python 3.11 or newer</td>
+      <td>Main application runtime.</td>
+    </tr>
+    <tr>
+      <td>Git</td>
+      <td>Clone and update the repository.</td>
+    </tr>
+    <tr>
+      <td>Bash compatible shell</td>
+      <td>Run setup and helper scripts.</td>
+    </tr>
+    <tr>
+      <td>Zotero</td>
+      <td>Recommended for citation aware Q&amp;A over your own PDF library.</td>
+    </tr>
+    <tr>
+      <td>At least one model provider</td>
+      <td>Use Anthropic, Gemini, DeepSeek, OpenAI, Ollama, or CLI routed providers.</td>
+    </tr>
+  </tbody>
+</table>
+
+You do not need every API key. One working model provider is enough to start.
+
+## First run checklist
+
+Open the Web UI and complete these steps in order:
+
+<table>
+  <thead>
+    <tr>
+      <th>Step</th>
+      <th>Page</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><code>/settings</code></td>
+      <td>Add at least one API key or configure a CLI provider.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>/providers</code></td>
+      <td>Test each model alias you want to use.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>/settings</code></td>
+      <td>Set <code>THESIS_ROOT</code>, <code>ZOTERO_STORAGE</code>, Zotero user ID, and Zotero API key if needed.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>/index-setup</code></td>
+      <td>Check Zotero path diagnostics and index your PDFs.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>/projects</code></td>
+      <td>Create your active thesis, manuscript, or review project.</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><code>/ask-library</code></td>
+      <td>Ask a small test question and confirm that retrieval and citations work.</td>
+    </tr>
+  </tbody>
+</table>
+
+## Configuration
+
+You can configure the app from the browser:
+
+```text
+http://127.0.0.1:5050/settings
+```
+
+Or edit `.env` manually:
 
 ```bash
-alias ra="research-assistant"
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+DEEPSEEK_API_KEY=sk-...
+OPENAI_API_KEY=sk-...
+
+ZOTERO_USER_ID=1234567
+ZOTERO_API_KEY=...
+THESIS_ROOT=/home/you/thesis
+ZOTERO_STORAGE=/home/you/Zotero/storage
+
+SEMANTIC_SCHOLAR_API_KEY=
+ELICIT_API_KEY=
+
+CLAUDE_CLI_CMD="claude -p"
+GEMINI_CLI_CMD="gemini -p"
+CODEX_CLI_CMD="codex exec"
+OLLAMA_CLI_CMD="ollama run llama3.3"
+CLI_TIMEOUT=600
 ```
 
-#### To add them manually
-
-Open your shell config file with a text editor:
+Model aliases can be changed without editing source code:
 
 ```bash
-nano ~/.bashrc
+RA_MODEL_CLAUDE=anthropic/claude-opus-4-8
+RA_MODEL_SONNET=anthropic/claude-sonnet-4-6
+RA_MODEL_GPT=openai/gpt-5
+RA_MODEL_GEMINI=gemini/gemini-2.5-pro
+RA_MODEL_FLASH=gemini/gemini-2.5-flash
+RA_MODEL_LOCAL=ollama/llama3.3
 ```
 
-Paste the two lines above at the end, then save (`Ctrl+O`) and exit (`Ctrl+X`). Finally, reload:
+Pattern:
 
-```bash
-source ~/.bashrc
+```text
+RA_MODEL_<ALIAS>=provider/model-name
 ```
 
-#### If the project directory is moved or deleted
+Examples:
 
-The installed wrapper detects at runtime whether the project directory still exists. If you move or delete the repo, running `research-assistant` prints a clear error telling you what happened and how to fix it — instead of a cryptic "No such file" crash.
-
-#### If you use a different shell
-
-| Shell | Config file | Notes |
-|---|---|---|
-| Bash | `~/.bashrc` | Most Linux defaults |
-| Zsh | `~/.zshrc` | macOS default |
-| Fish | `~/.config/fish/config.fish` | Uses different syntax — see [Fish docs](https://fishshell.com/docs/current/tutorial.html#path) |
-
-For Fish, the PATH line is different:
-
-```fish
-fish_add_path ~/.local/bin
-```
-
-But the alias (`alias ra="research-assistant"`) works the same.
-
-### Reference: all commands
-
-```bash
-ra                  # Start or reopen (the only command you need daily)
-ra stop             # Stop the background server
-ra restart          # Stop and start again
-ra status           # Show whether the server is running
-ra logs             # View recent server logs
-ra logs -f          # Follow logs live (Ctrl+C to exit)
-ra doctor           # Run system diagnostics
-ra open             # Open the browser (don't start server)
-ra config           # Show configuration file paths
-```
-
-These commands also work with the full name `research-assistant` (e.g. `research-assistant doctor`) if you prefer.
-
-### npm users
-
-If you prefer npm over the shell scripts:
-
-```bash
-npm run setup       # First time setup
-npm run start       # Start or reopen
-npm run stop        # Stop
-npm run restart     # Restart
-npm run status      # Server status
-npm run doctor      # Diagnostics
+```text
+RA_MODEL_GPT
+RA_MODEL_GEMINI
+RA_MODEL_DEEPSEEK
+RA_MODEL_LOCAL
 ```
 
 ## Default locations
@@ -183,151 +325,46 @@ npm run doctor      # Diagnostics
     <tr>
       <th>Item</th>
       <th>Default path</th>
-      <th>What it is used for</th>
+      <th>Purpose</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>Virtual environment</td>
+      <td>Python virtual environment</td>
       <td><code>~/.venvs/thesis</code></td>
-      <td>Python environment used to run the app and CLI commands.</td>
+      <td>Python environment used to run the app and CLI tools.</td>
     </tr>
     <tr>
-      <td>Project workspace</td>
+      <td>Research workspace</td>
       <td><code>~/thesis</code></td>
-      <td>Main local workspace for logs, drafts, project files, and research outputs.</td>
-    </tr>
-    <tr>
-      <td>Model usage logs</td>
-      <td><code>~/thesis/logs/</code></td>
-      <td>Saved model calls used for AI disclosure and transparency.</td>
+      <td>Main place for projects, drafts, notes, evidence, exports, logs, and runs.</td>
     </tr>
     <tr>
       <td>Zotero PDF storage</td>
       <td><code>~/Zotero/storage</code></td>
-      <td>Local Zotero attachment folder used for PDF indexing.</td>
+      <td>Local Zotero attachment folder used for indexing papers.</td>
     </tr>
     <tr>
       <td>Application settings</td>
       <td><code>.env</code></td>
-      <td>API keys, Zotero settings, provider commands, paths, and timeouts.</td>
+      <td>API keys, model settings, Zotero paths, CLI commands, and timeouts.</td>
     </tr>
     <tr>
-      <td>Server logs</td>
+      <td>Server logs and PID</td>
       <td><code>~/.local/share/research-assistant/</code></td>
-      <td>Background server PID and log files.</td>
+      <td>Background server log file and process ID.</td>
+    </tr>
+    <tr>
+      <td>Model usage logs</td>
+      <td><code>~/thesis/logs/</code></td>
+      <td>Used for AI usage review and disclosure statements.</td>
     </tr>
   </tbody>
 </table>
 
-## First time setup checklist
+## Recommended project structure
 
-After starting the Web UI, follow this order:
-
-<table>
-  <thead>
-    <tr>
-      <th>Step</th>
-      <th>Where to go</th>
-      <th>What to do</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>1</td>
-      <td><code>/settings</code></td>
-      <td>Add at least one model provider API key or configure a CLI provider.</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td><code>/providers</code></td>
-      <td>Test that the selected provider works before writing or indexing. Click "▷ Test" next to each model alias.</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td><code>/settings</code></td>
-      <td>Add Zotero user ID, Zotero API key, <code>THESIS_ROOT</code>, and <code>ZOTERO_STORAGE</code>.</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td><code>/index-setup</code></td>
-      <td>Index Zotero PDFs so the Ask and Evidence tools can retrieve from your own papers.</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td><code>/projects</code></td>
-      <td>Create or update the active research project with title, research question, hypothesis, keywords, citation style, and supervisor notes.</td>
-    </tr>
-    <tr>
-      <td>6</td>
-      <td><code>/ask</code></td>
-      <td>Ask a small test question to confirm that citations and retrieved evidence are working.</td>
-    </tr>
-  </tbody>
-</table>
-
-## Configuration
-
-You can configure the application from the browser:
-
-```text
-http://127.0.0.1:5050/settings
-```
-
-The settings page lets you edit API keys, Zotero configuration, provider commands, paths, and timeouts. Changes are written back to your `.env` file automatically.
-
-You only need one model provider to start.
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-GEMINI_API_KEY=...
-DEEPSEEK_API_KEY=sk-...
-OPENAI_API_KEY=sk-...
-```
-
-### Changing which model each alias points to
-
-Each model alias can be overridden with an environment variable in your `.env` file. This lets you switch to newer models without editing source code:
-
-```bash
-# Override individual model IDs (LiteLLM format)
-RA_MODEL_CLAUDE=anthropic/claude-opus-4-8
-RA_MODEL_SONNET=anthropic/claude-sonnet-4-6
-RA_MODEL_GPT=openai/gpt-5
-RA_MODEL_GEMINI=gemini/gemini-2.5-pro
-# …and so on for every alias: haiku, flash, deepseek, gpt-mini, codex, local
-```
-
-The pattern is `RA_MODEL_<ALIAS>` where `<ALIAS>` is the model key in uppercase (hyphens become underscores).
-
-For Zotero integration, configure these values from `/settings` or directly in `.env`:
-
-```bash
-ZOTERO_USER_ID=1234567
-ZOTERO_API_KEY=...
-THESIS_ROOT=/home/you/thesis
-ZOTERO_STORAGE=/home/you/Zotero/storage
-```
-
-Check provider health from:
-
-```text
-http://127.0.0.1:5050/providers
-```
-
-Model calls are logged under:
-
-```text
-~/thesis/logs/
-```
-
-These logs can be used to prepare AI usage disclosure text for thesis, manuscript, or institutional transparency requirements.
-
-## How to organize your work
-
-The tool works best when each thesis, manuscript, or review article has a clear folder inside `THESIS_ROOT`.
-
-Recommended structure:
+The app works best when each thesis, manuscript, or review has its own project folder inside `THESIS_ROOT`.
 
 ```text
 ~/thesis/
@@ -341,10 +378,9 @@ Recommended structure:
 │       └── paperforge/
 ├── logs/
 ├── indexes/
-└── disclosures/
+├── disclosures/
+└── runs/
 ```
-
-Suggested use for each folder:
 
 <table>
   <thead>
@@ -356,342 +392,80 @@ Suggested use for each folder:
   <tbody>
     <tr>
       <td><code>drafts/</code></td>
-      <td>Thesis chapters, manuscript sections, revised paragraphs, and long form writing.</td>
+      <td>Thesis chapters, manuscript sections, abstracts, and rewritten paragraphs.</td>
     </tr>
     <tr>
       <td><code>notes/</code></td>
-      <td>Your own reading notes, supervisor comments, meeting notes, and research ideas.</td>
+      <td>Your reading notes, meeting notes, supervisor comments, and research ideas.</td>
     </tr>
     <tr>
       <td><code>outlines/</code></td>
-      <td>Generated outlines, chapter plans, article structures, and section maps.</td>
+      <td>Generated outlines, section maps, chapter plans, and article structures.</td>
     </tr>
     <tr>
       <td><code>evidence/</code></td>
-      <td>Important cited answers, claim verification outputs, citation audit results, and evidence tables.</td>
+      <td>Cited answers, claim verification outputs, and evidence tables.</td>
     </tr>
     <tr>
       <td><code>exports/</code></td>
-      <td>Final copied outputs, disclosure text, report exports, and material prepared for submission.</td>
+      <td>Submission ready text, copied outputs, reports, and disclosure text.</td>
     </tr>
     <tr>
       <td><code>paperforge/</code></td>
-      <td>PaperForge drafts, review article outputs, quality checks, and revision loop outputs.</td>
+      <td>PaperForge drafts, review outputs, revision passes, charts, and final exports.</td>
     </tr>
     <tr>
       <td><code>logs/</code></td>
-      <td>Automatic model usage logs. Keep this folder if your thesis or journal requires AI disclosure.</td>
+      <td>Automatic AI usage logs. Keep them if your university or journal requires disclosure.</td>
     </tr>
   </tbody>
 </table>
 
-You can keep the default `~/thesis` path, or change it from `/settings` by editing `THESIS_ROOT`.
-
-## Where outputs are saved
-
-research-assistant has three kinds of saved work:
+## Where your work is saved
 
 <table>
   <thead>
     <tr>
-      <th>Output type</th>
+      <th>Work type</th>
       <th>Where to find it</th>
-      <th>How to use it later</th>
+      <th>How to continue later</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td>Saved Q&amp;A sessions</td>
       <td><code>/sessions</code></td>
-      <td>Return to previous questions, review cited answers, and delete sessions you no longer need.</td>
+      <td>Open the session, review the answer, and keep the evidence trail.</td>
     </tr>
     <tr>
-      <td>Workspace files</td>
-      <td><code>/workspace</code> and your <code>THESIS_ROOT</code> folder</td>
-      <td>Continue writing, copy text into your thesis, or organize outputs into project folders.</td>
+      <td>Project documents</td>
+      <td><code>/workspace</code> and <code>THESIS_ROOT</code></td>
+      <td>Continue editing the same project document.</td>
     </tr>
     <tr>
       <td>Project metadata</td>
       <td><code>/projects</code></td>
-      <td>Reuse project title, research question, hypothesis, keywords, citation style, and supervisor notes across tools.</td>
+      <td>Reuse the title, research question, hypothesis, keywords, discipline, and supervisor notes across tools.</td>
     </tr>
     <tr>
-      <td>Model logs</td>
-      <td><code>~/thesis/logs/</code> by default</td>
-      <td>Generate AI disclosure text and review which model was used for which task.</td>
+      <td>Model usage logs</td>
+      <td><code>~/thesis/logs/</code></td>
+      <td>Review model usage or generate AI disclosure text.</td>
     </tr>
     <tr>
-      <td>PaperForge outputs</td>
-      <td>The folder passed with <code>--output</code>, or the default output folder used by the module</td>
-      <td>Review generated drafts, revision passes, and quality checks before using them in academic writing.</td>
+      <td>Zotero index</td>
+      <td>Managed under the local research workspace</td>
+      <td>Use Ask Library, Evidence, Claim Verify, Audit, and Outline tools with retrieved sources.</td>
     </tr>
     <tr>
-      <td>Zotero indexed evidence</td>
-      <td>Managed by the local index created from Zotero PDFs</td>
-      <td>Use Ask, Evidence, Claim Verify, Audit, and Outline tools with citation aware retrieval.</td>
+      <td>PaperForge runs</td>
+      <td><code>~/thesis/runs/</code> or the output folder you choose</td>
+      <td>Review generated drafts, figures, checks, and final exports.</td>
     </tr>
   </tbody>
 </table>
 
-## How to return to previous work
-
-To continue a previous session, type:
-
-```bash
-ra
-```
-
-Your browser opens at `http://127.0.0.1:5050`.
-
-Then:
-
-<table>
-  <thead>
-    <tr>
-      <th>Goal</th>
-      <th>Go to</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Continue a saved question or answer</td>
-      <td><code>/sessions</code></td>
-    </tr>
-    <tr>
-      <td>Continue a thesis or manuscript file</td>
-      <td><code>/workspace</code></td>
-    </tr>
-    <tr>
-      <td>Check or change the active project</td>
-      <td><code>/projects</code></td>
-    </tr>
-    <tr>
-      <td>Check model usage and costs</td>
-      <td><code>/orchestration</code></td>
-    </tr>
-    <tr>
-      <td>Generate or review AI disclosure text</td>
-      <td><code>ra-disclose</code> or the disclosure tools in the Web UI</td>
-    </tr>
-    <tr>
-      <td>Run another Zotero indexing pass</td>
-      <td><code>/index</code> or <code>ra-researcher index</code></td>
-    </tr>
-  </tbody>
-</table>
-
-Good practice:
-
-```text
-Before closing the app:
-1. Copy important model outputs into a Workspace file.
-2. Keep cited answers in Sessions if you may need the evidence trail later.
-3. Export or save important drafts under the correct project folder.
-4. Keep logs if you need transparent AI usage records.
-```
-
-## Safe use and backup
-
-Do not commit private files, API keys, unpublished thesis drafts, Zotero PDFs, or model logs to a public GitHub repository.
-
-Recommended backup items:
-
-<table>
-  <thead>
-    <tr>
-      <th>Back up</th>
-      <th>Why</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>.env</code></td>
-      <td>Contains your local configuration. Store it securely because it may contain API keys.</td>
-    </tr>
-    <tr>
-      <td><code>THESIS_ROOT</code></td>
-      <td>Contains your drafts, notes, outputs, logs, and project files.</td>
-    </tr>
-    <tr>
-      <td>Zotero library</td>
-      <td>Contains the papers and metadata used for citation aware retrieval.</td>
-    </tr>
-  </tbody>
-</table>
-
-A safe backup command for your thesis workspace is:
-
-```bash
-tar -czf thesis-backup-$(date +%Y%m%d).tar.gz ~/thesis
-```
-
-For sensitive work, use encrypted storage or a private backup location.
-
-## Typical use cases
-
-<table>
-  <thead>
-    <tr>
-      <th>Task</th>
-      <th>Recommended page or command</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Ask a question from your Zotero papers</td>
-      <td><code>/ask</code> or <code>ra-researcher ask</code></td>
-    </tr>
-    <tr>
-      <td>Compare model answers before trusting one answer</td>
-      <td><code>/compare</code> or <code>ra-compare</code></td>
-    </tr>
-    <tr>
-      <td>Build a thesis or manuscript outline</td>
-      <td><code>/outline-recommender</code></td>
-    </tr>
-    <tr>
-      <td>Check whether a claim is supported</td>
-      <td><code>ra-claim-verify</code></td>
-    </tr>
-    <tr>
-      <td>Review citation quality</td>
-      <td><code>ra-audit</code></td>
-    </tr>
-    <tr>
-      <td>Improve a paragraph without changing meaning</td>
-      <td><code>ra-paraphrase</code> or paraphrase tools in the Web UI</td>
-    </tr>
-    <tr>
-      <td>Prepare for thesis defense</td>
-      <td><code>/defense</code></td>
-    </tr>
-    <tr>
-      <td>Generate AI usage disclosure</td>
-      <td><code>ra-disclose</code></td>
-    </tr>
-    <tr>
-      <td>Generate a paper draft from a codebase or topic</td>
-      <td><code>/paperforge</code>, <code>scripts/run_agentic.py</code>, or <code>scripts/run_review.py</code></td>
-    </tr>
-  </tbody>
-</table>
-
-## Complete uninstall
-
-To remove research-assistant from your system:
-
-### Automatic (if you still have the repo)
-
-```bash
-cd /path/to/research-assistant
-bash scripts/uninstall_cli.sh
-```
-
-This removes:
-- `~/.local/bin/research-assistant` (the CLI wrapper)
-- `~/.local/share/applications/research-assistant.desktop` (desktop launcher)
-- `~/.local/share/research-assistant/` (PID file and server logs)
-
-### Manual (if you deleted the repo already)
-
-```bash
-rm -f ~/.local/bin/research-assistant
-rm -f ~/.local/share/applications/research-assistant.desktop
-rm -rf ~/.local/share/research-assistant
-```
-
-### Clean up shell config
-
-If you previously added the `ra` alias or PATH line to `~/.bashrc`, open the file and remove them:
-
-```bash
-nano ~/.bashrc
-```
-
-Look for and delete these lines (if present):
-
-```bash
-# Added by research-assistant installer
-export PATH="$HOME/.local/bin:$PATH"
-alias ra="research-assistant"
-```
-
-### What is NOT removed (your research data)
-
-These directories contain YOUR work and are never touched by the uninstaller:
-
-| Directory | Contents |
-|---|---|
-| `~/thesis/` | Drafts, notes, outlines, sessions, logs |
-| `~/thesis/chroma_db/` | Vector index of your papers |
-| `~/.venvs/thesis/` | Python virtual environment |
-| `~/Zotero/storage/` | Your Zotero PDF library |
-
-To remove these as well (only if you're certain):
-
-```bash
-rm -rf ~/thesis ~/.venvs/thesis
-```
-
-## Troubleshooting
-
-<table>
-  <thead>
-    <tr>
-      <th>Problem</th>
-      <th>What to check</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>The <code>ra</code> command is not found</td>
-      <td>Run <code>bash scripts/install_cli.sh</code> then add the alias to <code>~/.bashrc</code> by hand. See <a href="#how-the-shell-configuration-works">How the shell configuration works</a> for exact instructions.</td>
-    </tr>
-    <tr>
-      <td><code>ra</code> or <code>research-assistant</code> gives "project directory not found"</td>
-      <td>The project was moved or deleted after installation. Run <code>rm ~/.local/bin/research-assistant</code> to remove the stale wrapper, then reinstall from the new location. See <a href="#complete-uninstall">Complete uninstall</a> for full cleanup.</td>
-    </tr>
-    <tr>
-      <td>The Web UI does not start</td>
-      <td>Run <code>research-assistant doctor</code> to diagnose. Check that Python and Flask are installed. Try <code>bash scripts/setup.sh</code> again.</td>
-    </tr>
-    <tr>
-      <td>A model provider test fails</td>
-      <td>Open <code>/providers</code>, click "▷ Test" next to each alias. Check your API key in <code>/settings</code>. For GPT-5 models, some temperature values are not supported — the test handles this automatically.</td>
-    </tr>
-    <tr>
-      <td>Zotero Library Search shows "No results found"</td>
-      <td>Check ZOTERO_STORAGE path in <code>/settings</code>. Both <code>~/Zotero/storage</code> and <code>/home/you/Zotero/storage</code> should work. Run <code>research-assistant doctor</code> to see if the path exists and how many PDFs are found. For Zotero API search, you also need ZOTERO_USER_ID and ZOTERO_API_KEY.</td>
-    </tr>
-    <tr>
-      <td>Zotero indexing shows zero PDFs</td>
-      <td>Check <code>/index-setup</code> diagnostics: resolved path, subfolder count, PDF count. Make sure ZOTERO_STORAGE points to the folder that contains subfolders with PDFs (not the parent of a single PDF). Run <code>research-assistant doctor</code> for a full diagnosis.</td>
-    </tr>
-    <tr>
-      <td>Answers do not contain useful citations</td>
-      <td>Index more relevant PDFs, ask a narrower question, or add stronger keywords to the active project.</td>
-    </tr>
-    <tr>
-      <td>CLI provider times out</td>
-      <td>Increase <code>CLI_TIMEOUT</code> in <code>/settings</code> or in <code>.env</code>.</td>
-    </tr>
-    <tr>
-      <td>You cannot find old work</td>
-      <td>Check <code>/sessions</code>, <code>/workspace</code>, the active project in <code>/projects</code>, and the folders under <code>THESIS_ROOT</code>.</td>
-    </tr>
-    <tr>
-      <td>Port 5050 is already in use</td>
-      <td>Run <code>research-assistant status</code> to check. Use <code>research-assistant restart</code> or set a different port with <code>RA_PORT=5051 ra</code>.</td>
-    </tr>
-    <tr>
-      <td>Paper Discovery returns no results</td>
-      <td>OpenAlex works without a key — check your internet connection. Semantic Scholar may need an API key for higher rate limits. Elicit requires a paid plan and ELICIT_API_KEY. Check status badges on the <code>/paper-discovery</code> page.</td>
-    </tr>
-  </tbody>
-</table>
-
-
-## Web UI
+## Web UI pages
 
 <table>
   <thead>
@@ -705,263 +479,147 @@ rm -rf ~/thesis ~/.venvs/thesis
     <tr>
       <td>Dashboard</td>
       <td><code>/</code></td>
-      <td>View index statistics, quick ask, recent sessions, and active project information.</td>
+      <td>Overview of index status, providers, sessions, and active project.</td>
     </tr>
     <tr>
-      <td>Ask</td>
-      <td><code>/ask</code></td>
-      <td>Ask citation-aware questions against your indexed papers.</td>
-    </tr>
-    <tr>
-      <td>Compare</td>
-      <td><code>/compare</code></td>
-      <td>Compare answers from different model providers on the same research question.</td>
+      <td>Ask Library</td>
+      <td><code>/ask-library</code></td>
+      <td>Ask with RAG, ask without context, or compare models in one place.</td>
     </tr>
     <tr>
       <td>Sessions</td>
       <td><code>/sessions</code></td>
-      <td>Browse, review, and delete saved research Q&amp;A sessions.</td>
+      <td>Review and delete saved research sessions.</td>
     </tr>
     <tr>
-      <td>Index</td>
-      <td><code>/index</code></td>
-      <td>Index Zotero papers and track background indexing progress.</td>
+      <td>Index setup</td>
+      <td><code>/index-setup</code></td>
+      <td>Check Zotero paths and run PDF indexing.</td>
     </tr>
     <tr>
-      <td>Tools</td>
-      <td><code>/tools/&lt;name&gt;</code></td>
-      <td>Use CLI tools from browser forms without leaving the Web UI.</td>
+      <td>Library search</td>
+      <td><code>/library-search</code></td>
+      <td>Search Zotero items and local PDFs.</td>
+    </tr>
+    <tr>
+      <td>Paper discovery</td>
+      <td><code>/paper-discovery</code></td>
+      <td>Search external paper discovery sources.</td>
+    </tr>
+    <tr>
+      <td>Writing Studio</td>
+      <td><code>/writing-studio</code></td>
+      <td>Outline, draft, critique, paraphrase, and coherence tools.</td>
     </tr>
     <tr>
       <td>Outline Recommender</td>
       <td><code>/outline-recommender</code></td>
-      <td>Generate paper-type-aware outlines with evidence mapping and active project prefill.</td>
+      <td>Create paper type aware outlines and optionally map evidence to sections.</td>
     </tr>
     <tr>
       <td>Projects</td>
       <td><code>/projects</code></td>
-      <td>Manage project title, research question, hypothesis, keywords, citation style, and supervisor notes.</td>
-    </tr>
-    <tr>
-      <td>Peer Review</td>
-      <td><code>/peer-review</code></td>
-      <td>Run structural, methodological, and citation-focused review passes across multiple models.</td>
-    </tr>
-    <tr>
-      <td>Defense</td>
-      <td><code>/defense</code></td>
-      <td>Generate thesis defense questions from friendly, strict, methodological, statistical, and field-expert examiner personas.</td>
-    </tr>
-    <tr>
-      <td>Orchestration</td>
-      <td><code>/orchestration</code></td>
-      <td>Monitor model calls, token usage, estimated cost, and daily usage trends.</td>
-    </tr>
-    <tr>
-      <td>Prompt Library</td>
-      <td><code>/prompts</code></td>
-      <td>Use curated academic prompts with one-click copy or send-to-Ask actions.</td>
+      <td>Create, edit, activate, and manage research projects.</td>
     </tr>
     <tr>
       <td>Workspace</td>
       <td><code>/workspace</code></td>
-      <td>Edit project files, manage thesis text, and organize writing work.</td>
+      <td>Edit project documents with source aware AI assistance and undo support.</td>
     </tr>
     <tr>
-      <td>Settings</td>
-      <td><code>/settings</code></td>
-      <td>Configure API keys, Zotero details, paths, CLI provider commands, and timeouts.</td>
+      <td>Peer Review</td>
+      <td><code>/peer-review</code></td>
+      <td>Run structural, methodology, and citation review passes.</td>
+    </tr>
+    <tr>
+      <td>Defense</td>
+      <td><code>/defense</code></td>
+      <td>Generate thesis defense questions from examiner personas.</td>
+    </tr>
+    <tr>
+      <td>Orchestration</td>
+      <td><code>/orchestration</code></td>
+      <td>Review model calls, token usage, cost estimates, and recent activity.</td>
+    </tr>
+    <tr>
+      <td>Prompt Library</td>
+      <td><code>/prompts</code></td>
+      <td>Browse curated academic prompts.</td>
     </tr>
     <tr>
       <td>Providers</td>
       <td><code>/providers</code></td>
-      <td>Test whether each configured model provider is working.</td>
+      <td>Check API and CLI provider status, then test each model alias.</td>
+    </tr>
+    <tr>
+      <td>Settings</td>
+      <td><code>/settings</code></td>
+      <td>Edit API keys, paths, provider commands, and timeout settings.</td>
     </tr>
     <tr>
       <td>PaperForge</td>
       <td><code>/paperforge</code></td>
-      <td>Generate paper drafts from code or topics with live progress updates.</td>
+      <td>Generate and revise paper drafts through a multi agent workflow.</td>
     </tr>
   </tbody>
 </table>
 
-## PaperForge
+Older routes such as `/ask`, `/compare`, and `/index` redirect to the newer consolidated pages where possible.
 
-**PaperForge** is the multi-agent paper generation pipeline. It produces academic papers from codebases or research topics with an interactive web UI, ZeroGPT-aware writing, publication-quality charts, and Research Assistant tool integration.
+## CLI tools
 
-### Web UI
+Everything important in the Web UI can also be used from the terminal.
 
-Start the server and open `http://localhost:5055/paperforge`:
+### Research
 
 ```bash
-./scripts/start.sh
+ra-researcher ask "What are the main mechanisms of TRAIL resistance in glioblastoma?"
+ra-researcher index
+ra-ask "Explain this concept" --model claude
+ra-compare "Compare these mechanisms across models"
+ra-zot "glioblastoma TRAIL resistance"
+ra-discover "metabolic rewiring glioblastoma resistance" --source openalex
+ra-evidence "What evidence supports metabolic adaptation in GBM resistance?"
 ```
 
-The interactive UI guides you through 6 steps:
-
-1. **Input** — code path + summary or research topic
-2. **Generate** — Outline (RA) → Code Analyst → Writer → Paraphrase (RA), with real-time SSE progress
-3. **Edit Draft** — per-section review with text selection, yellow highlighting, numbered feedback panels, and targeted revisions via Claude/DeepSeek
-4. **Figures** — review generated charts, request regenerations with feedback
-5. **Assess & Revise** — PF Assessor + RA Peer Review (structural, methodology, citation reviewers), automated revision loop
-6. **Finalize** — Plagiarism Check + RA Claim Verify + RA External Match, download paper.md and paper.docx
-
-Per-section features: Quick AI scoring, ZeroGPT checks with score persistence, version history with per-section revert (up to 10 versions), and state that survives server restarts.
-
-### Pipeline
-
-```
-Outline (RA) → Code/Lit Analyst → Writer (+ structured FIG data)
-    → Paraphrase (RA) → [Interactive Editing]
-    → Assessor + Peer Review ×3 → Rewriter
-    → Plagiarism + Claim Verify + External Match
-    → Figure Gen (Chart MCP, 8 types) → Finalize + Disclose (RA)
-```
-
-### CLI entry points
-
-<table>
-  <thead>
-    <tr><th>Script</th><th>Purpose</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><code>scripts/run_agentic.py</code></td><td>Generate paper from a codebase (single-pass, no UI).</td></tr>
-    <tr><td><code>scripts/run_review.py</code></td><td>Generate review article from a topic via web research.</td></tr>
-    <tr><td><code>scripts/generate_final_docx.py</code></td><td>Export a pipeline run to DOCX with embedded figures.</td></tr>
-    <tr><td><code>agentic/quick_ai_score.py</code></td><td>Mechanical AI-text detection (no API calls, 7 checks).</td></tr>
-    <tr><td><code>agentic/mcp_servers/chart_server.py</code></td><td>Chart MCP server: bar, grouped_bar, line, scatter, heatmap, timeline, pie, radar.</td></tr>
-    <tr><td><code>agentic/mcp_servers/zerogpt_server.py</code></td><td>ZeroGPT MCP server: Playwright-based AI detection via zerogpt.com.</td></tr>
-    <tr><td><code>agentic/mcp_servers/google_search_server.py</code></td><td>Search MCP: Brave Search API with DuckDuckGo fallback.</td></tr>
-  </tbody>
-</table>
-
-### Key features
-
-| Feature | Description |
-|---|---|
-| **AI-aware writing** | Writer prompt avoids ZeroGPT triggers (em dashes, formulaic phrases, uniform sentences). Per-section Quick AI scores + ZeroGPT checks. |
-| **Structured figures** | Writer outputs `[FIG bar|title|categories|values]` format. Chart MCP renders 8 chart types at 300 DPI. |
-| **RA integration** | Outline Recommender, Peer Review (3 reviewers), Claim Verify, External Match, Paraphrase, Disclose. |
-| **State persistence** | All pipeline state on disk at `~/thesis/runs/<id>/`. Survives restarts. Atomic writes with per-job locking. |
-| **DOCX export** | Times New Roman, embedded figures, AI-tell cleanup (**, em/en dashes stripped). |
-| **Road-tested** | Generated a 7,600-word personalized medicine review (22% ZeroGPT) and a 25K-char EGFR MD simulation paper with 4 publication-quality charts. |
-
-### CLI usage examples
+### Writing
 
 ```bash
-# One-time cache setup
-./scripts/run_agentic.py --refresh-style --domain bioinformatics
-./scripts/run_agentic.py --refresh-artifacts
-
-# Generate paper from codebase
-./scripts/run_agentic.py /path/to/project --summary "What it does" --output /tmp/paper
-
-# Generate review article
-./scripts/run_review.py --topic "CRISPR-Based Therapeutics: Delivery Methods"
-
-# Export pipeline run to DOCX with figures
-./scripts/generate_final_docx.py <job_id> --charts /path/to/charts
-
-# Quick AI score check
-./agentic/quick_ai_score.py paper.md --json
+ra-outline-recommender
+ra-ideas evidence.md --job "Explain why this pathway matters"
+ra-outline evidence.md --job "Structure the introduction"
+ra-critique draft.md
+ra-critic draft.md
+ra-paraphrase draft.md
+ra-coherence chapter.md
 ```
 
-## CLI usage
+### Verification and transparency
 
-Everything available in the Web UI can also be used from the terminal.
+```bash
+ra-audit draft.md
+ra-claim-verify draft.md
+ra-originality draft.md
+ra-verify bibliography.bib
+ra-disclose
+```
 
-<table>
-  <thead>
-    <tr>
-      <th>Command</th>
-      <th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>ra-researcher ask</code></td>
-      <td>Ask a RAG-backed question with cited output.</td>
-    </tr>
-    <tr>
-      <td><code>ra-researcher index</code></td>
-      <td>Index Zotero PDFs.</td>
-    </tr>
-    <tr>
-      <td><code>ra-compare</code></td>
-      <td>Compare multiple model responses.</td>
-    </tr>
-    <tr>
-      <td><code>ra-ask</code></td>
-      <td>Ask a single model directly.</td>
-    </tr>
-    <tr>
-      <td><code>ra-zot</code></td>
-      <td>Search your Zotero library.</td>
-    </tr>
-    <tr>
-      <td><code>ra-discover</code></td>
-      <td>Find papers through OpenAlex and Semantic Scholar.</td>
-    </tr>
-    <tr>
-      <td><code>ra-evidence</code></td>
-      <td>Run evidence-focused cited queries.</td>
-    </tr>
-    <tr>
-      <td><code>ra-outline-recommender</code></td>
-      <td>Generate paper-type-aware outlines with evidence mapping.</td>
-    </tr>
-    <tr>
-      <td><code>ra-ideas</code></td>
-      <td>Create paragraph angles from evidence.</td>
-    </tr>
-    <tr>
-      <td><code>ra-outline</code></td>
-      <td>Create section outlines with citation stubs.</td>
-    </tr>
-    <tr>
-      <td><code>ra-critique</code></td>
-      <td>Critique a draft.</td>
-    </tr>
-    <tr>
-      <td><code>ra-critic</code></td>
-      <td>Run a writer and critic workflow.</td>
-    </tr>
-    <tr>
-      <td><code>ra-paraphrase</code></td>
-      <td>Run writer, paraphraser, and meaning checker workflow.</td>
-    </tr>
-    <tr>
-      <td><code>ra-coherence</code></td>
-      <td>Analyze chapter coherence.</td>
-    </tr>
-    <tr>
-      <td><code>ra-audit</code></td>
-      <td>Audit citation usage.</td>
-    </tr>
-    <tr>
-      <td><code>ra-verify</code></td>
-      <td>Resolve citekeys against a bibliography file.</td>
-    </tr>
-    <tr>
-      <td><code>ra-claim-verify</code></td>
-      <td>Check whether claims are supported by retrieved evidence.</td>
-    </tr>
-    <tr>
-      <td><code>ra-originality</code></td>
-      <td>Check internal and external originality signals.</td>
-    </tr>
-    <tr>
-      <td><code>ra-disclose</code></td>
-      <td>Generate an AI usage disclosure statement.</td>
-    </tr>
-    <tr>
-      <td><code>ra-pipeline</code></td>
-      <td>Run the full research writing pipeline.</td>
-    </tr>
-  </tbody>
-</table>
+### Workspace tools
 
-Run any command with `--help` to see available options.
+```bash
+ra-project
+ra-orchestration
+ra-prompts
+ra-peer-review
+ra-defense
+```
+
+Run any command with `--help`:
+
+```bash
+ra-claim-verify --help
+ra-outline-recommender --help
+```
 
 ## Supported models
 
@@ -969,15 +627,15 @@ Run any command with `--help` to see available options.
   <thead>
     <tr>
       <th>Alias</th>
-      <th>Provider or model</th>
+      <th>Provider</th>
       <th>Recommended use</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td><code>claude</code></td>
-      <td>Claude</td>
-      <td>Long-form reasoning, critique, and revision.</td>
+      <td>Anthropic Claude</td>
+      <td>Long form reasoning, critique, synthesis, and revision.</td>
     </tr>
     <tr>
       <td><code>sonnet</code></td>
@@ -991,28 +649,28 @@ Run any command with `--help` to see available options.
     </tr>
     <tr>
       <td><code>gemini</code></td>
-      <td>Gemini</td>
-      <td>Long context, research synthesis, and multimodal workflows.</td>
+      <td>Google Gemini</td>
+      <td>Long context synthesis and research comparison.</td>
     </tr>
     <tr>
       <td><code>flash</code></td>
       <td>Gemini Flash</td>
-      <td>Fast and lower-cost processing.</td>
+      <td>Fast lower cost processing.</td>
     </tr>
     <tr>
       <td><code>deepseek</code></td>
-      <td>DeepSeek Chat</td>
-      <td>Draft generation and general writing tasks.</td>
+      <td>DeepSeek</td>
+      <td>Drafting, rewriting, and general text generation.</td>
     </tr>
     <tr>
       <td><code>gpt</code></td>
-      <td>GPT</td>
-      <td>General reasoning, writing, and structured output.</td>
+      <td>OpenAI GPT</td>
+      <td>General reasoning, structured output, and writing.</td>
     </tr>
     <tr>
       <td><code>gpt-mini</code></td>
-      <td>GPT Mini</td>
-      <td>Lower-cost general tasks.</td>
+      <td>OpenAI smaller model alias</td>
+      <td>Lower cost general tasks.</td>
     </tr>
     <tr>
       <td><code>local</code></td>
@@ -1022,108 +680,269 @@ Run any command with `--help` to see available options.
   </tbody>
 </table>
 
-CLI subscription aliases such as `claude-cli`, `gemini-cli`, `codex-cli`, and `ollama-cli` can also be configured.
+CLI routed aliases can also be configured, including:
+
+```text
+claude-cli
+gemini-cli
+codex-cli
+ollama-cli
+```
+
+## PaperForge
+
+**PaperForge** is the multi agent paper drafting workflow included inside research-assistant.
+
+It can help generate a structured paper draft from:
+
+1. A research topic.
+2. A codebase plus a short summary.
+3. A review article idea.
+
+Open it from:
+
+```text
+http://127.0.0.1:5050/paperforge
+```
+
+Typical PaperForge flow:
+
+```text
+Input topic or codebase
+→ Generate outline
+→ Analyze code or literature context
+→ Draft sections
+→ Edit sections interactively
+→ Generate or review figures
+→ Run assessment and peer review
+→ Check claims and originality signals
+→ Export final files
+```
+
+Useful scripts:
+
+```bash
+scripts/run_agentic.py
+scripts/run_review.py
+scripts/generate_final_docx.py
+agentic/quick_ai_score.py
+agentic/mcp_servers/chart_server.py
+agentic/mcp_servers/zerogpt_server.py
+agentic/mcp_servers/google_search_server.py
+```
+
+Example commands:
+
+```bash
+./scripts/run_agentic.py /path/to/project --summary "What the code does" --output /tmp/paper
+./scripts/run_review.py --topic "CRISPR based therapeutics and delivery methods"
+./scripts/generate_final_docx.py <job_id> --charts /path/to/charts
+./agentic/quick_ai_score.py paper.md --json
+```
 
 ## Example workflows
 
-### Ask a question over your Zotero library
+### Ask a cited question from your own papers
 
 ```bash
-ra-researcher ask "What are the main mechanisms of TRAIL resistance in glioblastoma?"
+ra-researcher ask "What are the major mechanisms of TRAIL resistance in glioblastoma?"
 ```
 
-### Compare multiple models
+### Compare model answers before trusting one output
 
 ```bash
 ra-compare "Summarize the evidence for metabolic rewiring in glioblastoma resistance."
 ```
 
-### Generate an outline
+### Create a thesis chapter outline
 
 ```bash
 ra-outline-recommender
 ```
 
-### Audit citations
+### Check whether claims are supported
 
 ```bash
-ra-audit draft.md
+ra-claim-verify draft.md
 ```
 
-### Generate AI disclosure text
+### Generate AI usage disclosure
 
 ```bash
 ra-disclose
 ```
 
-## When to use research-assistant
+## Safe use, privacy, and academic responsibility
+
+research-assistant is designed to support academic work, not replace the researcher, supervisor, reviewer, or clinician.
+
+Use it carefully:
+
+1. Verify every important claim against the original paper.
+2. Check whether cited sources actually support the sentence you wrote.
+3. Do not submit generated text without human revision.
+4. Follow your university, journal, conference, or institution rules for AI use.
+5. Disclose AI assistance when required.
+
+Privacy notes:
+
+1. Your workspace, drafts, logs, and indexes are stored locally by default.
+2. Model prompts may still be sent to external providers when you use API based models.
+3. Use local or CLI routed models if your project requires stricter data control.
+4. Never commit `.env`, unpublished drafts, private PDFs, Zotero files, model logs, or sensitive research data to a public repository.
+
+## Backup
+
+Recommended backup targets:
 
 <table>
   <thead>
     <tr>
-      <th>Use case</th>
-      <th>Why it helps</th>
+      <th>Back up</th>
+      <th>Reason</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>Thesis helper</td>
-      <td>Organizes papers, project context, prompts, drafts, and model outputs in one place.</td>
+      <td><code>.env</code></td>
+      <td>Contains local settings and may contain API keys. Store securely.</td>
     </tr>
     <tr>
-      <td>Literature review</td>
-      <td>Combines Zotero indexing, cited Q&amp;A, paper discovery, and outline generation.</td>
+      <td><code>THESIS_ROOT</code></td>
+      <td>Contains drafts, notes, evidence, sessions, logs, exports, and project files.</td>
     </tr>
     <tr>
-      <td>Academic drafting</td>
-      <td>Supports critique, paraphrase checking, coherence analysis, and citation auditing.</td>
-    </tr>
-    <tr>
-      <td>Research software papers</td>
-      <td>Can turn codebase context into a structured academic paper draft.</td>
-    </tr>
-    <tr>
-      <td>Model evaluation</td>
-      <td>Compares multiple models before relying on one output.</td>
-    </tr>
-    <tr>
-      <td>AI transparency</td>
-      <td>Keeps model usage logs and helps prepare disclosure statements.</td>
+      <td>Zotero library</td>
+      <td>Contains paper metadata and PDFs used for retrieval.</td>
     </tr>
   </tbody>
 </table>
 
-## Notes on responsible use
+Basic backup command:
 
-research-assistant is designed to support research, not replace academic judgment. Always verify claims, check citations, review generated text carefully, and follow the AI use policies of your university, journal, conference, or institution.
+```bash
+tar -czf thesis-backup-$(date +%Y%m%d).tar.gz ~/thesis
+```
 
-AI-assisted writing should be disclosed when required. The built-in logging and disclosure tools are intended to make this process easier.
+For sensitive research, use encrypted storage or a trusted private backup location.
+
+## Troubleshooting
+
+<table>
+  <thead>
+    <tr>
+      <th>Problem</th>
+      <th>Fix</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>research-assistant</code> is not found</td>
+      <td>Run <code>bash scripts/install_cli.sh</code>. Make sure <code>~/.local/bin</code> is in your <code>PATH</code>.</td>
+    </tr>
+    <tr>
+      <td><code>ra</code> is not found</td>
+      <td>Add <code>alias ra="research-assistant"</code> to <code>~/.bashrc</code> or use the full command.</td>
+    </tr>
+    <tr>
+      <td>Project directory not found</td>
+      <td>The repo was moved or deleted after installing the wrapper. Reinstall from the new repo path with <code>bash scripts/install_cli.sh</code>.</td>
+    </tr>
+    <tr>
+      <td>Web UI does not start</td>
+      <td>Run <code>research-assistant doctor</code>, then check logs with <code>research-assistant logs</code>.</td>
+    </tr>
+    <tr>
+      <td>Port 5050 is already in use</td>
+      <td>Run <code>research-assistant restart</code> or start with another port: <code>RA_PORT=5051 research-assistant</code>.</td>
+    </tr>
+    <tr>
+      <td>Provider test fails</td>
+      <td>Open <code>/settings</code>, check the API key or CLI command, then test again from <code>/providers</code>.</td>
+    </tr>
+    <tr>
+      <td>Zotero indexing finds zero PDFs</td>
+      <td>Open <code>/index-setup</code> and check diagnostics. <code>ZOTERO_STORAGE</code> should point to the folder containing Zotero attachment subfolders.</td>
+    </tr>
+    <tr>
+      <td>Answers have weak citations</td>
+      <td>Index more relevant papers, ask a narrower question, or add stronger project keywords.</td>
+    </tr>
+    <tr>
+      <td>CLI provider times out</td>
+      <td>Increase <code>CLI_TIMEOUT</code> in <code>.env</code> or from <code>/settings</code>.</td>
+    </tr>
+    <tr>
+      <td>You cannot find previous work</td>
+      <td>Check <code>/sessions</code>, <code>/workspace</code>, <code>/projects</code>, <code>~/thesis/logs/</code>, and your project folder under <code>THESIS_ROOT</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+## Updating
+
+```bash
+cd /path/to/research-assistant
+git pull
+bash scripts/setup.sh
+bash scripts/install_cli.sh
+research-assistant restart
+```
+
+If you changed `.env`, keep a private backup before major updates.
+
+## Uninstall
+
+Automatic uninstall if you still have the repo:
+
+```bash
+cd /path/to/research-assistant
+bash scripts/uninstall_cli.sh
+```
+
+Manual cleanup:
+
+```bash
+rm -f ~/.local/bin/research-assistant
+rm -f ~/.local/share/applications/research-assistant.desktop
+rm -rf ~/.local/share/research-assistant
+```
+
+The uninstaller does not remove your research data.
+
+These are your files and should be deleted only if you are sure:
+
+```bash
+rm -rf ~/thesis ~/.venvs/thesis
+```
+
+Your Zotero library is separate and is not removed by research-assistant.
 
 ## FAQ
 
-### Do I need all API keys?
-
-No. One provider is enough to start. More providers are useful for comparison and multi-agent workflows.
-
 ### Do I need Zotero?
 
-Zotero is recommended if you want citation-aware Q&A over your own papers. Some writing and model comparison tools can still be used without Zotero.
+No, but Zotero is strongly recommended. Citation aware Q&amp;A works best when your own papers are indexed from Zotero storage.
 
-### How long does indexing take?
+### Do I need all API keys?
 
-Indexing time depends on the number and size of PDFs. Already indexed papers are skipped by Zotero item key unless re-indexing is forced.
+No. One working model provider is enough. More providers are useful for comparison, peer review, and PaperForge workflows.
 
 ### Can I use local models?
 
-Yes. Ollama can be configured for local model workflows.
+Yes. Ollama can be configured through the `local` alias or through CLI routed commands.
 
-### Can I use a local embedding model?
+### Does this replace Zotero?
 
-Yes. For example, you can configure a local embedding model such as `ollama/nomic-embed-text` if your setup supports it.
+No. Zotero remains your reference manager. research-assistant uses Zotero as a source for retrieval, discovery, and writing workflows.
 
-### Is this a replacement for a supervisor or peer reviewer?
+### Does this replace my supervisor or peer reviewer?
 
-No. research-assistant helps with organization, drafting, evidence checking, and model comparison. Final academic judgment and responsibility remain with the researcher.
+No. It helps you organize evidence, draft text, compare models, and find possible weaknesses. Final academic responsibility remains with you.
+
+### Can I use it for sensitive or unpublished work?
+
+Yes, but be careful. Local files stay on your machine by default, but API based model calls may send prompts to external providers. For sensitive work, use local models or institutionally approved providers and follow your data governance rules.
 
 ## Project philosophy
 
@@ -1136,20 +955,49 @@ No. research-assistant helps with organization, drafting, evidence checking, and
   </thead>
   <tbody>
     <tr>
-      <td>Local-first</td>
-      <td>Your research workspace, indexed files, logs, and drafts stay organized on your own machine.</td>
+      <td>Local first</td>
+      <td>Your workspace, drafts, indexes, and logs are organized on your own machine by default.</td>
     </tr>
     <tr>
-      <td>Evidence-aware</td>
-      <td>The tool is designed to work with your own papers and make retrieved evidence visible.</td>
+      <td>Evidence aware</td>
+      <td>The tool is designed to keep retrieved papers visible during writing and verification.</td>
     </tr>
     <tr>
-      <td>Transparent AI use</td>
-      <td>AI assistance should be logged, reviewable, and explainable in academic workflows.</td>
+      <td>Model plural</td>
+      <td>You can compare providers instead of trusting one model output immediately.</td>
+    </tr>
+    <tr>
+      <td>Transparent</td>
+      <td>AI assistance should be logged, reviewable, and disclosed when required.</td>
+    </tr>
+    <tr>
+      <td>Researcher controlled</td>
+      <td>The tool supports academic judgment. It does not replace it.</td>
     </tr>
   </tbody>
 </table>
 
+## Contributing
+
+Feedback, issues, ideas, and pull requests are welcome.
+
+Helpful contributions include:
+
+1. Bug reports with command output and logs.
+2. Documentation improvements.
+3. New provider integrations.
+4. Better Zotero and PDF indexing diagnostics.
+5. More academic writing and verification tools.
+6. UI improvements for long thesis workflows.
+
+Before opening a pull request, run:
+
+```bash
+pytest tests/ -x --tb=short
+ruff check research_assistant/ agentic/ tests/
+ruff format research_assistant/ agentic/ tests/
+```
+
 ## License
 
-MIT License
+MIT License. See [LICENSE](LICENSE).
