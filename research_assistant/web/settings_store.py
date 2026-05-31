@@ -44,25 +44,26 @@ SEMI_SECRET_KEYS: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class EditableField:
-    """A non-secret config key the user may edit from the browser."""
+    """A config key the user may edit from the browser."""
 
     key: str
     label: str
     group: str
     default: str = ""
-    kind: str = "text"  # "text" | "number"
+    kind: str = "text"  # "text" | "number" | "password"
     help: str = ""
 
 
 # Order here is the order rendered on the page.
 EDITABLE_FIELDS: tuple[EditableField, ...] = (
+    # ── Paths ────────────────────────────────────────────────────────────────
     EditableField("THESIS_ROOT", "Thesis root", "Paths", str(Path.home() / "thesis"),
                   help="Where logs, sessions, drafts, exports, and the index live."),
     EditableField("ZOTERO_STORAGE", "Zotero storage", "Paths", "",
                   help="Path to your Zotero/storage folder (PDF attachments)."),
     EditableField("THESIS_DOCS", "Additional PDFs folder", "Paths", "",
                   help="Extra folder of PDFs to include in library searches. Falls back to THESIS_ROOT if empty."),
-    # Web UI
+    # ── Web UI ───────────────────────────────────────────────────────────────
     EditableField("RA_HOST", "Web UI host", "Web UI", "127.0.0.1",
                   help="Host the Flask app listens on. Change to 0.0.0.0 to expose on the network."),
     EditableField("RA_PORT", "Web UI port", "Web UI", "5050", kind="number",
@@ -71,22 +72,41 @@ EDITABLE_FIELDS: tuple[EditableField, ...] = (
                   help="Command used by `ra open`. macOS: open, Windows: start."),
     EditableField("FLASK_DEBUG", "Debug mode", "Web UI", "0", kind="number",
                   help="Set to 1 for hot reload and detailed error pages. Do not use in production."),
-    # Zotero
+    # ── Model API keys ───────────────────────────────────────────────────────
+    EditableField("ANTHROPIC_API_KEY", "Anthropic API key", "API keys", "",
+                  kind="password",
+                  help="Required for claude, sonnet, haiku model aliases."),
+    EditableField("OPENAI_API_KEY", "OpenAI API key", "API keys", "",
+                  kind="password",
+                  help="Required for gpt, gpt-mini, codex model aliases and default embeddings."),
+    EditableField("GEMINI_API_KEY", "Gemini API key", "API keys", "",
+                  kind="password",
+                  help="Required for gemini, flash model aliases."),
+    EditableField("DEEPSEEK_API_KEY", "DeepSeek API key", "API keys", "",
+                  kind="password",
+                  help="Required for deepseek model alias."),
+    # ── Zotero ───────────────────────────────────────────────────────────────
     EditableField("ZOTERO_USER_ID", "Zotero user ID", "Zotero", "",
                   help="Numeric user ID from zotero.org/settings/keys."),
-    # Paper Discovery
+    EditableField("ZOTERO_API_KEY", "Zotero API key", "Zotero", "",
+                  kind="password",
+                  help="API key with read access to your Zotero library. Create at zotero.org/settings/keys."),
+    # ── Paper Discovery ──────────────────────────────────────────────────────
     EditableField("OPENALEX_EMAIL", "OpenAlex email (optional)", "Paper Discovery", "",
-                  help="Email for OpenAlex polite pool — improves rate limits. Not a secret."),
+                  help="Email for OpenAlex polite pool — improves rate limits."),
     EditableField("SEMANTIC_SCHOLAR_API_KEY", "Semantic Scholar API key (optional)", "Paper Discovery", "",
+                  kind="password",
                   help="Increases rate limit for Semantic Scholar searches. Leave blank to use without key."),
     EditableField("ELICIT_API_KEY", "Elicit API key (optional)", "Paper Discovery", "",
+                  kind="password",
                   help="Required for Elicit searches. Requires a paid plan."),
     EditableField("BRAVE_API_KEY", "Brave Search API key (optional)", "Paper Discovery", "",
+                  kind="password",
                   help="Web search via Brave Search API. Free tier: 2,000 queries/month."),
-    # Vector Index
+    # ── Vector Index ─────────────────────────────────────────────────────────
     EditableField("EMBEDDING_MODEL", "Embedding model", "Vector Index", "openai/text-embedding-3-small",
                   help="LiteLLM model string for embeddings. Default uses OpenAI; use ollama/nomic-embed-text for local."),
-    # CLI providers
+    # ── CLI providers ────────────────────────────────────────────────────────
     EditableField("CLAUDE_CLI_CMD", "Claude CLI command", "CLI providers", "claude -p"),
     EditableField("GEMINI_CLI_CMD", "Gemini CLI command", "CLI providers", "gemini -p"),
     EditableField("CODEX_CLI_CMD", "Codex CLI command", "CLI providers", "codex exec"),
@@ -94,7 +114,7 @@ EDITABLE_FIELDS: tuple[EditableField, ...] = (
     EditableField("OLLAMA_MODEL", "Ollama model (API)", "CLI providers", "ollama/llama3.3",
                   help="Model string used by the LiteLLM-managed `local` alias."),
     EditableField("CLI_TIMEOUT", "CLI timeout (seconds)", "CLI providers", "600", kind="number"),
-    # Misc
+    # ── Misc ─────────────────────────────────────────────────────────────────
     EditableField("EDITOR", "Editor", "Misc", "",
                   help="Used by interactive review loops (paraphrase/critic). Falls back to VISUAL, then nano."),
     EditableField("CONTACT_EMAIL", "Contact email", "Misc", "",
@@ -123,16 +143,19 @@ def env_path() -> Path:
 def secret_status() -> list[dict]:
     """Report which secret keys are configured, without revealing any value.
 
-    Includes both full secrets (SECRET_KEYS) and semi-secret keys
-    (SEMI_SECRET_KEYS — email addresses and user IDs that are not
-    themselves secrets but are still sensitive).
+    Only covers keys that are NOT already editable — keys in EDITABLE_FIELDS
+    are shown with masked password inputs instead.
     """
     result: list[dict] = []
     for key in SECRET_KEYS:
+        if key in EDITABLE_KEYS:
+            continue  # shown as editable password field instead
         result.append(
             {"key": key, "configured": bool(os.getenv(key, "").strip())}
         )
     for key in SEMI_SECRET_KEYS:
+        if key in EDITABLE_KEYS:
+            continue
         result.append(
             {"key": key, "configured": bool(os.getenv(key, "").strip())}
         )
@@ -140,9 +163,20 @@ def secret_status() -> list[dict]:
 
 
 def editable_values() -> list[dict]:
-    """Current value (or default) for each editable field, grouped for display."""
+    """Current value (or default) for each editable field, grouped for display.
+
+    Password fields never echo their real value — they show a placeholder
+    when configured and an empty field otherwise.
+    """
     out: list[dict] = []
     for f in EDITABLE_FIELDS:
+        raw = os.getenv(f.key, "") or ""
+        if f.kind == "password":
+            display_value = "••••••••" if raw else ""
+            placeholder = "•••••••• (already set)" if raw else f.default
+        else:
+            display_value = raw
+            placeholder = f.default
         out.append(
             {
                 "key": f.key,
@@ -150,8 +184,8 @@ def editable_values() -> list[dict]:
                 "group": f.group,
                 "kind": f.kind,
                 "help": f.help,
-                "value": os.getenv(f.key, "") or "",
-                "placeholder": f.default,
+                "value": display_value,
+                "placeholder": placeholder,
             }
         )
     return out
@@ -168,17 +202,24 @@ def _format_value(value: str) -> str:
 def validate(updates: dict[str, str]) -> dict[str, str]:
     """Validate + normalise editable updates. Returns the clean subset to write.
 
-    Rejects any non-editable key (defends against secret writes) and validates
-    numeric fields. Raises ValueError on bad input.
+    Rejects any non-editable key (defends against secret writes), skips
+    masked password placeholders, and validates numeric fields.
+    Raises ValueError on bad input.
     """
     numeric_keys = {f.key for f in EDITABLE_FIELDS if f.kind == "number"}
+    password_keys = {f.key for f in EDITABLE_FIELDS if f.kind == "password"}
+    masked_sentinels = {"••••••••", "********", ""}
+
     clean: dict[str, str] = {}
     for key, raw in updates.items():
         if key not in EDITABLE_KEYS:
-            continue  # silently ignore anything not allow-listed (e.g. secrets)
+            continue  # silently ignore anything not allow-listed
         value = (raw or "").strip()
+        # Skip masked password placeholders — user didn't change the key
+        if key in password_keys and value in masked_sentinels:
+            continue
         if key in numeric_keys and value and not value.isdigit():
-            raise ValueError(f"{key} must be a whole number of seconds.")
+            raise ValueError(f"{key} must be a whole number.")
         clean[key] = value
     return clean
 

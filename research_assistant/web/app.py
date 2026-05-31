@@ -139,12 +139,13 @@ def _get_index_data():
         return {"exists": True, "documents": 0, "chunks": 0, "error": True}
 
 
-def _run_index_in_background(collection_name: str | None, limit: int | None, force: bool, use_local: bool = False):
+def _run_index_in_background(collection_name: str | None, limit: int | None, force: bool, use_local: bool = False, pdf_dir: str | None = None):
     """Run indexing in a background thread, updating _index_state with lock.
 
     When *use_local* is True (or no Zotero API credentials are configured),
     indexes PDFs directly from ``ZOTERO_STORAGE`` / ``THESIS_DOCS`` without
-    the Zotero API.
+    the Zotero API.  If *pdf_dir* is given it is passed through to
+    ``index_local_pdfs``.
     """
     global _index_state
     with _index_lock:
@@ -164,7 +165,7 @@ def _run_index_in_background(collection_name: str | None, limit: int | None, for
             else:
                 console_msg = "Indexing local PDFs..."
             print(console_msg)
-            stats = index_local_pdfs(force=force)
+            stats = index_local_pdfs(pdf_dir=pdf_dir, force=force)
         else:
             stats = index_zotero_papers(
                 collection_name=collection_name,
@@ -384,10 +385,13 @@ def index_start():
     limit_raw = request.form.get("limit", "").strip()
     limit = _safe_int(limit_raw, 0) if limit_raw else None
     force = request.form.get("force") == "on"
+    use_local = request.form.get("use_local") == "on"
+    pdf_dir = request.form.get("pdf_dir", "").strip() or None
 
     thread = threading.Thread(
         target=_run_index_in_background,
         args=(collection, limit, force),
+        kwargs={"use_local": use_local, "pdf_dir": pdf_dir},
         daemon=True,
     )
     thread.start()

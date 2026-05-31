@@ -56,7 +56,8 @@
                 </label>
                 {% if f.help %}<p class="text-xs text-slate-500 mt-0.5">{{ f.help }}</p>{% endif %}
                 <input id="f-{{ f.key }}" name="{{ f.key }}"
-                       type="{{ 'number' if f.kind == 'number' else 'text' }}"
+                       type="{{ 'number' if f.kind == 'number' else 'password' if f.kind == 'password' else 'text' }}"
+                       {% if f.kind == 'password' %}autocomplete="new-password"{% endif %}
                        value="{{ f.value }}" placeholder="{{ f.placeholder }}"
                        class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
             </div>
