@@ -31,6 +31,13 @@ SECRET_KEYS: tuple[str, ...] = (
     "FLASK_SECRET_KEY",
 )
 
+# Non-secret keys that are still sensitive enough that we only report
+# configured/not-set (never echo their values in the UI).
+SEMI_SECRET_KEYS: tuple[str, ...] = (
+    "OPENALEX_EMAIL",
+    "ZOTERO_USER_ID",
+)
+
 
 @dataclass(frozen=True)
 class EditableField:
@@ -50,8 +57,16 @@ EDITABLE_FIELDS: tuple[EditableField, ...] = (
                   help="Where logs, sessions, and the index live."),
     EditableField("ZOTERO_STORAGE", "Zotero storage", "Paths", "",
                   help="Path to your Zotero/storage folder (PDF attachments)."),
-    EditableField("ZOTERO_USER_ID", "Zotero user ID", "Paths", "",
+    EditableField("ZOTERO_USER_ID", "Zotero user ID", "Zotero", "",
                   help="Numeric user ID from zotero.org/settings/keys."),
+    # Paper discovery configuration
+    EditableField("OPENALEX_EMAIL", "OpenAlex email (optional)", "Paper Discovery", "",
+                  help="Email for OpenAlex polite pool — improves rate limits. Not a secret."),
+    EditableField("SEMANTIC_SCHOLAR_API_KEY", "Semantic Scholar API key (optional)", "Paper Discovery", "",
+                  help="Increases rate limit for Semantic Scholar searches. Leave blank to use without key."),
+    EditableField("ELICIT_API_KEY", "Elicit API key (optional)", "Paper Discovery", "",
+                  help="Required for Elicit searches. Requires a paid plan."),
+    # CLI providers
     EditableField("CLAUDE_CLI_CMD", "Claude CLI command", "CLI providers", "claude -p"),
     EditableField("GEMINI_CLI_CMD", "Gemini CLI command", "CLI providers", "gemini -p"),
     EditableField("CODEX_CLI_CMD", "Codex CLI command", "CLI providers", "codex exec"),

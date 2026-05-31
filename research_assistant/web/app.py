@@ -954,9 +954,10 @@ def library_search():
     field = request.args.get("field", "all")
     results = []
     pdfs = []
+    diagnostics = lib_mod.zotero_storage_diagnostics()
     if query:
         try:
-            results = lib_mod.search(query, field=field) if hasattr(lib_mod, 'search') else []
+            results = lib_mod.search(query, field=field)
         except Exception:
             results = []
     try:
@@ -965,19 +966,53 @@ def library_search():
         pdfs = []
     return render_template(
         "library_search.html", query=query, field=field,
-        results=results, pdfs=pdfs, pdf_root=str(lib_mod.configured_root()),
+        results=results, pdfs=pdfs,
+        pdf_root=str(lib_mod.configured_root()),
+        zotero_path=lib_mod.zotero_storage_path(),
+        diagnostics=diagnostics,
     )
 
 
 @app.route("/paper-discovery")
 def paper_discovery():
     """Paper discovery — OpenAlex, Semantic Scholar, Elicit in one page."""
-    return render_template("paper_discovery.html", models=MODELS)
+    # Paper discovery provider status (safe — no secrets shown)
+    discovery_providers = {
+        "openalex": {
+            "name": "OpenAlex",
+            "configured": True,  # OpenAlex works without any key
+            "status": "available",
+            "status_label": "Available (no key required)",
+            "note": "OpenAlex is always available without an API key.",
+        },
+        "semantic_scholar": {
+            "name": "Semantic Scholar",
+            "configured": True,  # Works without key, better with one
+            "status": "available",
+            "status_label": "Available" if not os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
+                        else "Available (API key configured — higher rate limit)",
+            "note": "Works without key at lower rate limits. Add API key for higher limits.",
+        },
+        "elicit": {
+            "name": "Elicit",
+            "configured": bool(os.environ.get("ELICIT_API_KEY", "").strip()),
+            "status": "available" if os.environ.get("ELICIT_API_KEY", "").strip() else "not_configured",
+            "status_label": "Available (API key configured)" if os.environ.get("ELICIT_API_KEY", "").strip()
+                           else "Requires API key — configure ELICIT_API_KEY in Settings",
+            "note": "Elicit requires a paid plan and API key. Set ELICIT_API_KEY in Settings.",
+        },
+    }
+    return render_template(
+        "paper_discovery.html",
+        models=MODELS,
+        discovery_providers=discovery_providers,
+    )
 
 
 @app.route("/index-setup")
 def index_setup():
     """Index and Zotero setup wizard."""
+    from research_assistant.workspace import library as lib_mod
     state = _get_index_state()
     index_data = _get_index_data()
     zotero_storage = os.environ.get("ZOTERO_STORAGE", "")
@@ -985,17 +1020,19 @@ def index_setup():
     zotero_user_id = os.environ.get("ZOTERO_USER_ID", "")
     zotero_api_key_set = bool(os.environ.get("ZOTERO_API_KEY", ""))
 
-    # Check path existence
-    storage_exists = bool(zotero_storage and Path(zotero_storage).exists())
-    thesis_exists = bool(thesis_root and Path(thesis_root).exists())
+    # Use library diagnostics for detailed Zotero storage info
+    diagnostics = lib_mod.zotero_storage_diagnostics()
 
-    # Count PDFs if path exists
-    pdf_count = 0
-    if storage_exists:
-        try:
-            pdf_count = len(list(Path(zotero_storage).rglob("*.pdf")))
-        except Exception:
-            pdf_count = 0
+    # Check path existence
+    storage_exists = diagnostics.get("exists", False)
+    thesis_root_path = Path(thesis_root).expanduser() if thesis_root else None
+    thesis_exists = bool(thesis_root_path and thesis_root_path.exists())
+
+    pdf_count = diagnostics.get("pdfs", 0)
+    subfolder_count = diagnostics.get("subfolders", 0)
+
+    # Check if Zotero API is available
+    zotero_api_available = bool(zotero_user_id and zotero_api_key_set)
 
     return render_template(
         "index_setup.html",
@@ -1003,7 +1040,9 @@ def index_setup():
         zotero_storage=zotero_storage, thesis_root=thesis_root,
         zotero_user_id=zotero_user_id, zotero_api_key_set=zotero_api_key_set,
         storage_exists=storage_exists, thesis_exists=thesis_exists,
-        pdf_count=pdf_count,
+        pdf_count=pdf_count, subfolder_count=subfolder_count,
+        diagnostics=diagnostics,
+        zotero_api_available=zotero_api_available,
     )
 
 

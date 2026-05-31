@@ -70,17 +70,71 @@ The goal is to help researchers work with their own papers, ask better questions
 git clone https://github.com/femrebora/research-assistant
 cd research-assistant
 bash scripts/setup.sh
-source ~/.venvs/thesis/bin/activate
-ra-web
+bash scripts/install_cli.sh
+source ~/.bashrc
+ra
 ```
 
-Open the Web UI:
+That's it. Your browser opens at `http://127.0.0.1:5050`.
 
-```text
-http://127.0.0.1:5050
+The setup script creates a Python virtual environment, installs the package, creates a `.env` file, and prepares default research folders. The install script adds the `ra` command and `research-assistant` command to your shell.
+
+### Daily workflow
+
+Start or reopen:
+
+```bash
+ra
 ```
 
-The setup script creates a Python virtual environment, installs the package in editable mode, creates a `.env` file from `env.example`, and prepares the default local research folders.
+Stop:
+
+```bash
+ra stop
+```
+
+**The simple rule:** Type `ra` to start or reopen. Type `ra stop` to stop.
+
+- Closing the browser does **not** stop the app.
+- Closing the terminal does **not** stop the app (it runs in the background).
+- After restarting your computer, just type `ra` again.
+- If the app is already running, `ra` simply reopens your browser.
+
+Alternative full command:
+
+```bash
+research-assistant
+research-assistant stop
+```
+
+Advanced commands (not needed for daily use):
+
+```bash
+research-assistant restart     # Stop and start again
+research-assistant status      # Show server status
+research-assistant logs        # View recent logs
+research-assistant logs -f     # Follow logs live
+research-assistant doctor      # Run system diagnostics
+research-assistant open        # Open browser (server not required)
+research-assistant config      # Show configuration paths
+```
+
+If something is wrong, run:
+
+```bash
+research-assistant doctor
+```
+
+### npm users
+
+```bash
+npm run setup       # First time setup
+npm run start       # Start or reopen
+npm run stop        # Stop
+npm run restart     # Restart
+npm run status      # Server status
+npm run doctor      # Diagnostics
+```
 
 Default locations:
 
@@ -118,6 +172,11 @@ Default locations:
       <td><code>.env</code></td>
       <td>API keys, Zotero settings, provider commands, paths, and timeouts.</td>
     </tr>
+    <tr>
+      <td>Server logs</td>
+      <td><code>~/.local/share/research-assistant/</code></td>
+      <td>Background server PID and log files.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -142,7 +201,7 @@ After starting the Web UI, follow this order:
     <tr>
       <td>2</td>
       <td><code>/providers</code></td>
-      <td>Test that the selected provider works before writing or indexing.</td>
+      <td>Test that the selected provider works before writing or indexing. Click "▷ Test" next to each model alias.</td>
     </tr>
     <tr>
       <td>3</td>
@@ -151,7 +210,7 @@ After starting the Web UI, follow this order:
     </tr>
     <tr>
       <td>4</td>
-      <td><code>/index</code></td>
+      <td><code>/index-setup</code></td>
       <td>Index Zotero PDFs so the Ask and Evidence tools can retrieve from your own papers.</td>
     </tr>
     <tr>
@@ -166,36 +225,6 @@ After starting the Web UI, follow this order:
     </tr>
   </tbody>
 </table>
-
-## Daily workflow
-
-A simple daily workflow is:
-
-```text
-1. Start the environment
-2. Open the Web UI
-3. Check the active project
-4. Ask or compare model answers using your indexed papers
-5. Save useful outputs into the Workspace
-6. Audit or verify claims before adding text to your thesis
-7. Generate disclosure logs when needed
-```
-
-Commands:
-
-```bash
-cd research-assistant
-source ~/.venvs/thesis/bin/activate
-ra-web
-```
-
-Then open:
-
-```text
-http://127.0.0.1:5050
-```
-
-Use the Web UI for most work. Use the CLI when you want repeatable commands, scripting, or batch workflows.
 
 ## Configuration
 
@@ -351,13 +380,13 @@ research-assistant has three kinds of saved work:
 
 ## How to return to previous work
 
-To continue a previous session:
+To continue a previous session, type:
 
 ```bash
-cd research-assistant
-source ~/.venvs/thesis/bin/activate
-ra-web
+ra
 ```
+
+Your browser opens at `http://127.0.0.1:5050`.
 
 Then:
 
@@ -503,16 +532,24 @@ For sensitive work, use encrypted storage or a private backup location.
   </thead>
   <tbody>
     <tr>
+      <td>The <code>ra</code> command is not found</td>
+      <td>Run <code>bash scripts/install_cli.sh</code> then <code>source ~/.bashrc</code>. Make sure <code>~/.local/bin</code> is in your PATH.</td>
+    </tr>
+    <tr>
       <td>The Web UI does not start</td>
-      <td>Activate the environment with <code>source ~/.venvs/thesis/bin/activate</code>, then run <code>ra-web</code> again.</td>
+      <td>Run <code>research-assistant doctor</code> to diagnose. Check that Python and Flask are installed. Try <code>bash scripts/setup.sh</code> again.</td>
     </tr>
     <tr>
-      <td>A model provider fails</td>
-      <td>Open <code>/providers</code>, check your API key in <code>/settings</code>, and confirm the selected provider alias is configured.</td>
+      <td>A model provider test fails</td>
+      <td>Open <code>/providers</code>, click "▷ Test" next to each alias. Check your API key in <code>/settings</code>. For GPT-5 models, some temperature values are not supported — the test handles this automatically.</td>
     </tr>
     <tr>
-      <td>Zotero papers are not found</td>
-      <td>Check <code>ZOTERO_USER_ID</code>, <code>ZOTERO_API_KEY</code>, and <code>ZOTERO_STORAGE</code>. Then run indexing again from <code>/index</code>.</td>
+      <td>Zotero Library Search shows "No results found"</td>
+      <td>Check ZOTERO_STORAGE path in <code>/settings</code>. Both <code>~/Zotero/storage</code> and <code>/home/you/Zotero/storage</code> should work. Run <code>research-assistant doctor</code> to see if the path exists and how many PDFs are found. For Zotero API search, you also need ZOTERO_USER_ID and ZOTERO_API_KEY.</td>
+    </tr>
+    <tr>
+      <td>Zotero indexing shows zero PDFs</td>
+      <td>Check <code>/index-setup</code> diagnostics: resolved path, subfolder count, PDF count. Make sure ZOTERO_STORAGE points to the folder that contains subfolders with PDFs (not the parent of a single PDF). Run <code>research-assistant doctor</code> for a full diagnosis.</td>
     </tr>
     <tr>
       <td>Answers do not contain useful citations</td>
@@ -525,6 +562,14 @@ For sensitive work, use encrypted storage or a private backup location.
     <tr>
       <td>You cannot find old work</td>
       <td>Check <code>/sessions</code>, <code>/workspace</code>, the active project in <code>/projects</code>, and the folders under <code>THESIS_ROOT</code>.</td>
+    </tr>
+    <tr>
+      <td>Port 5050 is already in use</td>
+      <td>Run <code>research-assistant status</code> to check. Use <code>research-assistant restart</code> or set a different port with <code>RA_PORT=5051 ra</code>.</td>
+    </tr>
+    <tr>
+      <td>Paper Discovery returns no results</td>
+      <td>OpenAlex works without a key — check your internet connection. Semantic Scholar may need an API key for higher rate limits. Elicit requires a paid plan and ELICIT_API_KEY. Check status badges on the <code>/paper-discovery</code> page.</td>
     </tr>
   </tbody>
 </table>

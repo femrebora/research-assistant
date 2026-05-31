@@ -18,13 +18,21 @@
                     <p class="provider-name">{{ p.name }}</p>
                     <p class="provider-env">{{ p.env_var }}</p>
                 </div>
-                {% if p.configured %}
+                {% if p.status == "tested_ok" %}
                 <span class="status-pill status-pill-ok">
-                    <span class="status-dot status-dot-ok"></span> Connected
+                    <span class="status-dot status-dot-ok"></span> Tested OK
+                </span>
+                {% elif p.status == "tested_failed" %}
+                <span class="status-pill status-pill-bad">
+                    <span class="status-dot status-dot-bad"></span> Test failed
+                </span>
+                {% elif p.configured %}
+                <span class="status-pill status-pill-warn">
+                    <span class="status-dot status-dot-warn"></span> Key present (not tested)
                 </span>
                 {% else %}
                 <span class="status-pill status-pill-muted">
-                    <span class="status-dot status-dot-muted"></span> Missing key
+                    <span class="status-dot status-dot-muted"></span> Not configured
                 </span>
                 {% endif %}
             </div>
@@ -70,7 +78,10 @@
                 {% endif %}
             </div>
             {% if c.found %}
-            <p style="font-size:0.75rem;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ c.path }}">{{ c.path }}</p>
+            <p style="font-size:0.75rem;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ c.path }}"><code>{{ c.path }}</code></p>
+            {% if c.version %}
+            <p style="font-size:0.6875rem;color:var(--color-text-muted);" title="{{ c.version }}">Version: {{ c.version[:80] }}</p>
+            {% endif %}
             {% else %}
             <p style="font-size:0.75rem;color:var(--color-warning);">Binary <code>{{ c.binary }}</code> not in PATH. Install it or override the command on the Settings page.</p>
             {% endif %}

@@ -1,0 +1,34 @@
+{
+  "name": "research-assistant",
+  "version": "1.0.0",
+  "description": "Local thesis and literature review toolkit with Flask Web UI, Zotero library indexing, model providers, and PaperForge.",
+  "private": true,
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "start": "bash scripts/start_web.sh",
+    "stop": "bash scripts/stop_web.sh",
+    "restart": "bash scripts/restart_web.sh",
+    "status": "bash scripts/status.sh",
+    "logs": "bash scripts/logs.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "install-cli": "bash scripts/install_cli.sh",
+    "install-desktop": "bash scripts/install_desktop_launcher.sh",
+    "test": "pytest tests/ -x --tb=short",
+    "lint": "ruff check research_assistant/ agentic/ tests/",
+    "format": "ruff format research_assistant/ agentic/ tests/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/femrebora/research-assistant"
+  },
+  "keywords": [
+    "research",
+    "thesis",
+    "literature-review",
+    "zotero",
+    "rag",
+    "academic-writing"
+  ],
+  "author": "Furkan Emre Bora",
+  "license": "MIT"
+}

@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import shlex
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass
 
@@ -52,16 +53,49 @@ class CliStatus:
     binary: str
     found: bool
     path: str | None
+    version: str | None = None
 
 
 @dataclass(frozen=True)
 class ApiStatus:
-    """Configuration state of a single API-keyed provider (never the key itself)."""
+    """Configuration state of a single API-keyed provider (never the key itself).
+
+    Status values:
+      - "not_configured": no API key set
+      - "key_present": API key is configured but not tested
+      - "tested_ok": tested successfully
+      - "tested_failed": test call failed
+      - "rate_limited": currently rate limited
+      - "unavailable": service unavailable
+    """
 
     name: str
     env_var: str
     aliases: tuple[str, ...]
     configured: bool
+    status: str = "not_configured"
+    last_test_error: str | None = None
+
+
+def _get_version(binary: str) -> str | None:
+    """Try to get the version string from a CLI tool."""
+    for flag in ("--version", "-v", "version"):
+        try:
+            result = subprocess.run(
+                [binary, flag],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                version = result.stdout.strip().split("\n")[0][:100]
+                return version
+            # Some tools output version to stderr
+            if result.stderr.strip():
+                version = result.stderr.strip().split("\n")[0][:100]
+                if "version" in version.lower() or result.returncode == 0:
+                    return version
+        except Exception:
+            pass
+    return None
 
 
 def cli_provider_status() -> list[CliStatus]:
@@ -71,6 +105,9 @@ def cli_provider_status() -> list[CliStatus]:
         parts = shlex.split(command)
         binary = parts[0] if parts else ""
         path = shutil.which(binary) if binary else None
+        version = None
+        if path:
+            version = _get_version(binary)
         statuses.append(
             CliStatus(
                 alias=alias,
@@ -78,22 +115,41 @@ def cli_provider_status() -> list[CliStatus]:
                 binary=binary,
                 found=path is not None,
                 path=path,
+                version=version,
             )
         )
     return statuses
 
 
 def api_provider_status() -> list[ApiStatus]:
-    """Report which API providers have a key configured (without revealing it)."""
-    return [
-        ApiStatus(
-            name=p["name"],
-            env_var=p["env_var"],
-            aliases=p["aliases"],
-            configured=bool(os.getenv(p["env_var"], "").strip()),
+    """Report which API providers have a key configured (without revealing it).
+
+    Status is "key_present" when key exists but hasn't been tested yet.
+    The test endpoint updates status to "tested_ok" or "tested_failed".
+    """
+    results: list[ApiStatus] = []
+    for p in API_PROVIDERS:
+        key_value = os.getenv(p["env_var"], "").strip()
+        configured = bool(key_value)
+        # Basic key format validation (warn on obviously invalid keys)
+        status = "not_configured"
+        if configured:
+            status = "key_present"
+            # Quick sanity check on API key format
+            if p["env_var"] == "ANTHROPIC_API_KEY" and not key_value.startswith("sk-ant-"):
+                status = "key_present"  # still present, just flag
+            elif p["env_var"] == "OPENAI_API_KEY" and not key_value.startswith("sk-"):
+                status = "key_present"
+        results.append(
+            ApiStatus(
+                name=p["name"],
+                env_var=p["env_var"],
+                aliases=p["aliases"],
+                configured=configured,
+                status=status,
+            )
         )
-        for p in API_PROVIDERS
-    ]
+    return results
 
 
 def test_provider(alias: str, prompt: str = "Reply with the single word: OK.") -> dict:
@@ -107,13 +163,30 @@ def test_provider(alias: str, prompt: str = "Reply with the single word: OK.") -
 
     start = time.monotonic()
     try:
-        result = ask_model(prompt, model=alias, max_tokens=16, temperature=0.0)
+        # For GPT-5 family models, temperature=0 is not supported.
+        # Use temperature=1 as a safe default for testing.
+        model_full = MODELS.get(alias, "")
+        if "gpt-5" in str(model_full).lower() or (alias in ("gpt", "gpt-mini", "codex") and "gpt-5" in str(model_full)):
+            test_temp = 1.0
+        else:
+            test_temp = 0.0
+
+        result = ask_model(prompt, model=alias, max_tokens=16, temperature=test_temp)
     except Exception as e:  # surface any provider error to the UI
+        error_msg = str(e)[:400]
+        # Classify the error
+        if "rate" in error_msg.lower() and "limit" in error_msg.lower():
+            status = "rate_limited"
+        elif "unavailable" in error_msg.lower() or "503" in error_msg:
+            status = "unavailable"
+        else:
+            status = "tested_failed"
         return {
             "ok": False,
             "alias": alias,
             "elapsed_ms": int((time.monotonic() - start) * 1000),
-            "error": str(e)[:400],
+            "error": error_msg,
+            "status": status,
         }
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -126,4 +199,5 @@ def test_provider(alias: str, prompt: str = "Reply with the single word: OK.") -
         "elapsed_ms": elapsed_ms,
         "snippet": text[:200],
         "error": None if ok else (text[:400] or "Empty response."),
+        "status": "tested_ok" if ok else "tested_failed",
     }

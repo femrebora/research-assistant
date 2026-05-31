@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# research-assistant — start, stop, and manage Research Assistant.
+#
+# Daily usage:
+#   ra                      Start or reopen Research Assistant
+#   ra stop                 Stop Research Assistant
+#
+# Full command:
+#   research-assistant      Start or reopen
+#   research-assistant stop Stop
+#
+# Advanced:
+#   research-assistant restart
+#   research-assistant status
+#   research-assistant logs [-n N] [-f]
+#   research-assistant doctor [--export]
+#   research-assistant open
+#   research-assistant config
+set -euo pipefail
+
+# Resolve the project directory — this script lives in scripts/
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+usage() {
+    cat <<EOF
+Usage: research-assistant [COMMAND]
+
+Daily commands:
+  (no command)          Start or reopen Research Assistant
+  stop                  Stop Research Assistant
+
+Advanced commands:
+  restart               Stop and start again
+  status                Show server status
+  logs [-n N] [-f]      View server logs (default: last 50 lines)
+  doctor [--export]     Run system diagnostics
+  open                  Open browser without starting server
+  config                Show configuration paths
+
+Alias: ra
+EOF
+    exit 0
+}
+
+case "${1:-}" in
+    ""|start)
+        exec bash "$PROJECT_DIR/scripts/start_web.sh"
+        ;;
+    stop)
+        exec bash "$PROJECT_DIR/scripts/stop_web.sh"
+        ;;
+    restart)
+        exec bash "$PROJECT_DIR/scripts/restart_web.sh"
+        ;;
+    status)
+        exec bash "$PROJECT_DIR/scripts/status.sh"
+        ;;
+    logs)
+        shift
+        exec bash "$PROJECT_DIR/scripts/logs.sh" "$@"
+        ;;
+    doctor)
+        shift
+        exec bash "$PROJECT_DIR/scripts/doctor.sh" "$@"
+        ;;
+    open)
+        BROWSER="${RA_BROWSER:-xdg-open}"
+        HOST="${RA_HOST:-127.0.0.1}"
+        PORT="${RA_PORT:-5050}"
+        exec "$BROWSER" "http://${HOST}:${PORT}" 2>/dev/null || true
+        ;;
+    config)
+        echo "Project directory: $PROJECT_DIR"
+        DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/research-assistant"
+        echo "Data directory:    $DATA_DIR"
+        echo "Log file:          $DATA_DIR/research-assistant.log"
+        echo "PID file:          $DATA_DIR/research-assistant.pid"
+        echo "Web URL:           http://${RA_HOST:-127.0.0.1}:${RA_PORT:-5050}"
+        if [ -f "$PROJECT_DIR/.env" ]; then
+            echo "Env file:          $PROJECT_DIR/.env"
+        else
+            echo "Env file:          (not found)"
+        fi
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Try: research-assistant --help"
+        exit 1
+        ;;
+esac

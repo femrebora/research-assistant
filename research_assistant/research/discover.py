@@ -94,6 +94,11 @@ def search_openalex(query: str, limit: int = 20, year_from: int | None = None) -
         params["filter"] = f"from_publication_date:{year_from}-01-01"
 
     headers = {"User-Agent": USER_AGENT}
+    # OpenAlex polite pool — provide email for better rate limits
+    email = os.getenv("OPENALEX_EMAIL", "").strip()
+    if email:
+        headers["mailto"] = email
+
     with httpx.Client(timeout=HTTP_TIMEOUT, headers=headers) as client:
         r = client.get(OPENALEX_URL, params=params)
         r.raise_for_status()
