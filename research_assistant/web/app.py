@@ -139,22 +139,47 @@ def _get_index_data():
         return {"exists": True, "documents": 0, "chunks": 0, "error": True}
 
 
-def _run_index_in_background(collection_name: str | None, limit: int | None, force: bool):
-    """Run indexing in a background thread, updating _index_state with lock."""
+def _run_index_in_background(collection_name: str | None, limit: int | None, force: bool, use_local: bool = False):
+    """Run indexing in a background thread, updating _index_state with lock.
+
+    When *use_local* is True (or no Zotero API credentials are configured),
+    indexes PDFs directly from ``ZOTERO_STORAGE`` / ``THESIS_DOCS`` without
+    the Zotero API.
+    """
     global _index_state
     with _index_lock:
         _index_state = {"running": True, "progress": 0, "total": 0, "status": "starting", "error": None, "stats": None}
 
     try:
-        from research_assistant.researcher import index_zotero_papers
-        stats = index_zotero_papers(
-            collection_name=collection_name,
-            limit=limit,
-            force=force,
-        )
+        from research_assistant.researcher import index_local_pdfs, index_zotero_papers
+
+        # Auto-detect: if Zotero API is not configured, use local indexing
+        zotero_user = os.environ.get("ZOTERO_USER_ID", "").strip()
+        zotero_key = os.environ.get("ZOTERO_API_KEY", "").strip()
+        can_use_zotero = bool(zotero_user and zotero_key)
+
+        if use_local or not can_use_zotero:
+            if not can_use_zotero and not use_local:
+                console_msg = "Zotero API not configured — indexing local PDFs instead."
+            else:
+                console_msg = "Indexing local PDFs..."
+            print(console_msg)
+            stats = index_local_pdfs(force=force)
+        else:
+            stats = index_zotero_papers(
+                collection_name=collection_name,
+                limit=limit,
+                force=force,
+            )
         with _index_lock:
             _index_state["stats"] = stats
             _index_state["status"] = "complete"
+    except SystemExit:
+        # index_* calls sys.exit(1) on fatal config errors — capture as error state
+        with _index_lock:
+            if not _index_state["error"]:
+                _index_state["error"] = "Indexing failed — check your configuration (ZOTERO_STORAGE, API keys, or PDF directory)."
+            _index_state["status"] = "error"
     except Exception as e:
         with _index_lock:
             _index_state["error"] = str(e)
@@ -963,6 +988,9 @@ def ask_library():
     use_rag = True
     tab = request.args.get("tab", "rag")
     index_exists = _get_index_data()["exists"]
+    flash_error = None
+    flash_warning = None
+    compare_rag_fallback = False
 
     if request.method == "POST":
         action = request.form.get("action", "rag")
@@ -975,7 +1003,13 @@ def ask_library():
             save_name = request.form.get("save_name", "").strip()
             tab = "rag"
 
-            if question and index_exists:
+            if question and not index_exists:
+                flash_error = (
+                    "No document index found. Go to "
+                    '<a href="/index-setup">Index & Setup</a> to index your PDFs first, '
+                    "or use the <b>Single-model</b> tab for direct questions without document context."
+                )
+            elif question and index_exists:
                 try:
                     result = ask_research_question(
                         question=question, model=model, temperature=0.3,
@@ -1011,6 +1045,13 @@ def ask_library():
             use_rag = request.form.get("use_rag") == "on"
             save_name = request.form.get("save_name", "").strip()
             tab = "compare"
+            if use_rag and not index_exists:
+                compare_rag_fallback = True
+                flash_warning = (
+                    "RAG was requested but no document index exists. "
+                    "Showing direct model comparison instead. "
+                    '<a href="/index-setup">Index your PDFs</a> to enable RAG comparison.'
+                )
             if question and selected_models:
                 try:
                     if use_rag and index_exists:
@@ -1050,6 +1091,8 @@ def ask_library():
         save_name=save_name, result=result, outcomes=outcomes,
         selected_models=selected_models, use_rag=use_rag,
         models=MODELS, index_exists=index_exists, tab=tab,
+        flash_error=flash_error, flash_warning=flash_warning,
+        compare_rag_fallback=compare_rag_fallback,
     )
 
 

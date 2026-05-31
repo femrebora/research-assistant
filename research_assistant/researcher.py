@@ -506,6 +506,152 @@ def _find_collection_key(zot, name: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+def index_local_pdfs(
+    pdf_dir: str | None = None,
+    force: bool = False,
+    embedding_model: str = DEFAULT_EMBED_MODEL,
+    chunk_size: int = CHUNK_SIZE,
+) -> dict:
+    """Index PDFs directly from a directory — no Zotero API required.
+
+    Scans *pdf_dir* (defaults to ``ZOTERO_STORAGE`` then ``THESIS_DOCS``)
+    for ``.pdf`` files, extracts their text, chunks, embeds, and stores
+    everything in the same ChromaDB collection used by ``index_zotero_papers``.
+
+    Metadata is derived from the filename and directory path since no
+    Zotero metadata is available.
+    """
+    resolved_dir: Path | None = None
+    for candidate in (pdf_dir, os.getenv("ZOTERO_STORAGE"), os.getenv("THESIS_DOCS")):
+        if candidate:
+            p = Path(candidate).expanduser()
+            if p.exists():
+                resolved_dir = p
+                break
+
+    if resolved_dir is None:
+        console.print(
+            "[red]No PDF directory found.[/red]\n"
+            "Set ZOTERO_STORAGE or THESIS_DOCS in .env to a folder containing PDFs."
+        )
+        sys.exit(1)
+
+    pdf_files = sorted(resolved_dir.rglob("*.pdf"))
+    if not pdf_files:
+        console.print(f"[yellow]No .pdf files found under {resolved_dir}[/yellow]")
+        return {
+            "total_items": 0, "with_pdfs": 0, "indexed": 0,
+            "skipped": 0, "failed": 0, "total_chunks": 0,
+        }
+
+    import hashlib
+
+    console.print(f"[dim]Found {len(pdf_files)} PDF(s) under {resolved_dir}[/dim]\n")
+
+    client = _get_chroma_client()
+    collection = _get_collection(client)
+
+    stats = {
+        "total_items": len(pdf_files),
+        "with_pdfs": len(pdf_files),
+        "indexed": 0,
+        "skipped": 0,
+        "failed": 0,
+        "total_chunks": 0,
+    }
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("[cyan]Indexing local PDFs...", total=len(pdf_files))
+
+        for pdf_path in pdf_files:
+            rel = str(pdf_path.relative_to(resolved_dir))
+            progress.update(task, description=f"[cyan]{rel[:60]}...")
+
+            # Derive a stable key from the absolute path
+            doc_key = hashlib.sha256(str(pdf_path.resolve()).encode()).hexdigest()[:16]
+
+            # Check if already indexed
+            if not force and _is_document_indexed(collection, doc_key):
+                stats["skipped"] += 1
+                progress.advance(task)
+                continue
+
+            text = _extract_pdf_text(pdf_path)
+            if not text:
+                stats["failed"] += 1
+                progress.advance(task)
+                continue
+
+            chunks = chunk_text(text, size=chunk_size)
+            if not chunks:
+                stats["failed"] += 1
+                progress.advance(task)
+                continue
+
+            # Remove existing chunks if forcing re-index
+            if force:
+                _remove_document(collection, doc_key)
+
+            try:
+                embeddings = _embed_texts(chunks, model=embedding_model)
+            except Exception:
+                stats["failed"] += 1
+                progress.advance(task)
+                continue
+
+            stem = pdf_path.stem[:80]
+            ids = [f"{doc_key}_chunk_{i:04d}" for i in range(len(chunks))]
+            metadatas = [
+                {
+                    "zotero_key": doc_key,
+                    "citekey": "",
+                    "title": stem,
+                    "authors_short": "",
+                    "year": "",
+                    "doi": "",
+                    "item_type": "local_pdf",
+                    "chunk_index": i,
+                    "total_chunks": len(chunks),
+                    "source_file": rel,
+                    "date_indexed": datetime.now(tz=UTC).isoformat(),
+                }
+                for i in range(len(chunks))
+            ]
+
+            try:
+                collection.upsert(
+                    ids=ids,
+                    documents=chunks,
+                    embeddings=embeddings,
+                    metadatas=metadatas,
+                )
+                stats["indexed"] += 1
+                stats["total_chunks"] += len(chunks)
+            except Exception:
+                stats["failed"] += 1
+
+            progress.advance(task)
+
+    _store_index_meta(
+        collection,
+        {
+            "embedding_model": embedding_model,
+            "chunk_size": chunk_size,
+            "chunk_overlap": CHUNK_OVERLAP,
+            "total_documents": stats["indexed"],
+            "total_chunks": stats["total_chunks"],
+        },
+    )
+
+    return stats
+
+
 # ── Retrieval ────────────────────────────────────────────────────────────────
 
 
@@ -995,17 +1141,39 @@ def main():
     type=int,
     help="Chunk size in characters.",
 )
-def index_cmd(collection, limit, force, embedding_model, chunk_size):
-    """Index Zotero PDFs into the local vector store."""
+@click.option(
+    "--local", is_flag=True,
+    help="Index PDFs directly from ZOTERO_STORAGE / THESIS_DOCS — no Zotero API needed.",
+)
+@click.option(
+    "--pdf-dir", default=None,
+    help="Path to a folder of PDFs (overrides ZOTERO_STORAGE / THESIS_DOCS).",
+)
+def index_cmd(collection, limit, force, embedding_model, chunk_size, local, pdf_dir):
+    """Index PDFs into the local vector store.
+
+    Default: indexes from your Zotero library via the Zotero API.
+
+    With --local: scans ZOTERO_STORAGE (or THESIS_DOCS) for .pdf files and
+    indexes them directly — no Zotero API credentials needed.
+    """
     console.print("[bold]Researcher: Index[/bold]\n")
 
-    stats = index_zotero_papers(
-        collection_name=collection,
-        limit=limit,
-        force=force,
-        embedding_model=embedding_model,
-        chunk_size=chunk_size,
-    )
+    if local or pdf_dir:
+        stats = index_local_pdfs(
+            pdf_dir=pdf_dir,
+            force=force,
+            embedding_model=embedding_model,
+            chunk_size=chunk_size,
+        )
+    else:
+        stats = index_zotero_papers(
+            collection_name=collection,
+            limit=limit,
+            force=force,
+            embedding_model=embedding_model,
+            chunk_size=chunk_size,
+        )
 
     console.print("")
     table = Table(title="Index Summary")

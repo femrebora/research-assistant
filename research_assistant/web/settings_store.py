@@ -108,13 +108,16 @@ def env_path() -> Path:
     """Resolve the .env file to read/write.
 
     Override with ``RA_ENV_FILE``; otherwise use the nearest existing .env;
-    otherwise default to ``.env`` in the current working directory.
+    otherwise fall back to ``.env`` in the current working directory
+    (creating it if needed).
     """
     override = os.getenv("RA_ENV_FILE", "").strip()
     if override:
         return Path(override)
     found = find_dotenv(usecwd=True)
-    return Path(found) if found else Path.cwd() / ".env"
+    if found:
+        return Path(found)
+    return Path.cwd() / ".env"
 
 
 def secret_status() -> list[dict]:
