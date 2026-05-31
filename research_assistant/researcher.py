@@ -46,7 +46,29 @@ DEFAULT_THRESHOLD = 0.35
 
 CHROMA_DIR = THESIS_ROOT / "chroma_db"
 SESSION_DIR = THESIS_ROOT / "research_sessions"
-SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_session_dir() -> None:
+    """Create SESSION_DIR on first use (not at import time).
+
+    Deferring this avoids crashing the entire app at import time when
+    THESIS_ROOT points to an inaccessible path (e.g. a stale hardcoded
+    path in .env).
+    """
+    try:
+        SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    except (PermissionError, OSError) as e:
+        import sys
+
+        print(
+            f"Error: Cannot create session directory at {SESSION_DIR}\n"
+            f"  Check that THESIS_ROOT in your .env file points to a writable location.\n"
+            f"  Current value: {os.getenv('THESIS_ROOT', '(default)')}\n"
+            f"  Expanded path: {THESIS_ROOT}\n"
+            f"  Detail: {e}",
+            file=sys.stderr,
+        )
+        raise
 
 # ── System Prompt ────────────────────────────────────────────────────────────
 
@@ -794,6 +816,7 @@ def save_session(
     append: bool = False,
 ) -> Path:
     """Save a Q&A to a session file. Returns the file path."""
+    _ensure_session_dir()
     safe_name = _safe_session_name(name)
     path = (SESSION_DIR / safe_name).resolve()
     if not str(path).startswith(str(SESSION_DIR.resolve())):
@@ -858,6 +881,7 @@ def _save_comparison_session(
     name: str, question: str, outcomes: dict[str, dict], append: bool = False
 ) -> Path:
     """Save a multi-model comparison to a session file."""
+    _ensure_session_dir()
     safe_name = _safe_session_name(name)
     path = (SESSION_DIR / safe_name).resolve()
     if not str(path).startswith(str(SESSION_DIR.resolve())):

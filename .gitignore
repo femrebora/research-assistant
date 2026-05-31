@@ -1,11 +1,32 @@
+# ── Secrets & local configuration ──────────────────────────────────────────
 .env
+
+# ── Python ─────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# ── Virtual environment ────────────────────────────────────────────────────
 .venv/
+venv/
+
+# ── Research workspace (auto-created under THESIS_ROOT) ────────────────────
 logs/
 chroma_db/
 research_sessions/
-.pytest_cache/
-*.egg-info/
-__pycache__/
-.ruff_cache/
+cache/
+runs/
+thesis/
+
+# ── Model usage logs (contain prompts & responses) ─────────────────────────
+*.jsonl
+*.log
+
+# ── OS junk ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
