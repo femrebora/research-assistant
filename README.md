@@ -51,7 +51,6 @@ Many research workflows become messy because papers, notes, drafts, citations, A
 | Requirement                 | Why it is needed                                       |
 | --------------------------- | ------------------------------------------------------ |
 | Python 3.11 or newer        | Main application runtime                               |
-| Git                         | Clone and update the repository                        |
 | Bash compatible shell       | Run setup scripts                                      |
 | Zotero                      | Recommended for citation aware work with your own PDFs |
 | At least one model provider | API key, local Ollama model, or CLI routed model       |
