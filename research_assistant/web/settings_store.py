@@ -165,16 +165,24 @@ def secret_status() -> list[dict]:
 def editable_values() -> list[dict]:
     """Current value (or default) for each editable field, grouped for display.
 
-    Password fields never echo their real value — they show a placeholder
-    when configured and an empty field otherwise.
+    Password fields never echo their real value to the browser — the input
+    is always rendered empty.  A separate ``configured`` flag tells the
+    template whether a key is already set so it can show a status badge.
     """
     out: list[dict] = []
     for f in EDITABLE_FIELDS:
         raw = os.getenv(f.key, "") or ""
         if f.kind == "password":
-            display_value = "••••••••" if raw else ""
-            placeholder = "•••••••• (already set)" if raw else f.default
+            configured = bool(raw)
+            # Always empty — never echo secrets to the DOM
+            display_value = ""
+            placeholder = (
+                "Leave blank to keep current key"
+                if configured
+                else f.default
+            )
         else:
+            configured = False
             display_value = raw
             placeholder = f.default
         out.append(
@@ -186,6 +194,7 @@ def editable_values() -> list[dict]:
                 "help": f.help,
                 "value": display_value,
                 "placeholder": placeholder,
+                "configured": configured,
             }
         )
     return out

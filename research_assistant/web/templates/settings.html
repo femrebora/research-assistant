@@ -53,12 +53,17 @@
             <div>
                 <label for="f-{{ f.key }}" class="block text-sm font-medium text-slate-700">{{ f.label }}
                     <span class="font-mono text-xs text-slate-400">{{ f.key }}</span>
+                    {% if f.configured %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 ml-2">
+                        ✓ configured
+                    </span>
+                    {% endif %}
                 </label>
                 {% if f.help %}<p class="text-xs text-slate-500 mt-0.5">{{ f.help }}</p>{% endif %}
                 <input id="f-{{ f.key }}" name="{{ f.key }}"
                        type="{{ 'number' if f.kind == 'number' else 'password' if f.kind == 'password' else 'text' }}"
-                       {% if f.kind == 'password' %}autocomplete="new-password"{% endif %}
-                       value="{{ f.value }}" placeholder="{{ f.placeholder }}"
+                       {% if f.kind == 'password' %}autocomplete="new-password" value=""{% else %}value="{{ f.value }}"{% endif %}
+                       placeholder="{{ f.placeholder }}"
                        class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
             </div>
             {% endfor %}

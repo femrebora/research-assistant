@@ -854,7 +854,17 @@ def settings_page():
     if request.method == "POST":
         try:
             path = settings_store.save(request.form.to_dict())
-            flash_ok = f"Saved to {path}. Restart ra-web for changes to take full effect."
+            # Check if any path-like fields were changed (these need a restart)
+            path_keys = {"THESIS_ROOT", "ZOTERO_STORAGE", "THESIS_DOCS"}
+            changed_paths = path_keys & set(request.form.to_dict().keys())
+            if changed_paths:
+                flash_ok = (
+                    f"Saved to {path.name}. "
+                    "API keys take effect immediately. "
+                    "Restart ra-web for path changes to take full effect."
+                )
+            else:
+                flash_ok = f"Saved to {path.name}. All changes take effect immediately."
         except (ValueError, OSError) as exc:
             flash_error = str(exc)
 
@@ -946,7 +956,12 @@ def panel_settings_save():
     """HTMX endpoint: save settings from the right panel, return status inline."""
     try:
         path = settings_store.save(request.form.to_dict())
-        ok_msg = f"Saved to {path.name}"
+        path_keys = {"THESIS_ROOT", "ZOTERO_STORAGE", "THESIS_DOCS"}
+        changed_paths = path_keys & set(request.form.to_dict().keys())
+        if changed_paths:
+            ok_msg = f"Saved. Restart for path changes to apply."
+        else:
+            ok_msg = f"Saved to {path.name}"
         return render_template(
             "_panel_settings.html",
             secrets=settings_store.secret_status(),
