@@ -839,6 +839,113 @@ def settings_page():
     )
 
 
+# ── Right panel routes (HTMX partials) ──────────────────────────────────────
+
+
+@app.route("/panel/status")
+def panel_status():
+    """HTMX partial: system status overview for the right control panel."""
+    api_providers = api_provider_status()
+    cli_providers = cli_provider_status()
+    index_data = _get_index_data()
+    index_state = _get_index_state()
+
+    api_configured = sum(1 for p in api_providers if p.configured)
+    api_total = len(api_providers)
+    cli_found = sum(1 for p in cli_providers if p.found)
+    cli_total = len(cli_providers)
+
+    # Server info
+    data_dir = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "research-assistant"
+    pid_file = data_dir / "research-assistant.pid"
+    log_file = data_dir / "research-assistant.log"
+
+    server_running = False
+    server_pid = None
+    if pid_file.exists():
+        try:
+            pid = int(pid_file.read_text().strip())
+            server_pid = pid
+            os.kill(pid, 0)
+            server_running = True
+        except (ValueError, OSError):
+            pass
+
+    log_size = ""
+    if log_file.exists():
+        try:
+            size = log_file.stat().st_size
+            if size < 1024:
+                log_size = f"{size} B"
+            elif size < 1024 * 1024:
+                log_size = f"{size / 1024:.1f} KB"
+            else:
+                log_size = f"{size / (1024 * 1024):.1f} MB"
+        except OSError:
+            log_size = "?"
+
+    return render_template(
+        "_panel_status.html",
+        api_providers=api_providers,
+        cli_providers=cli_providers,
+        index_data=index_data,
+        index_state=index_state,
+        api_configured=api_configured,
+        api_total=api_total,
+        cli_found=cli_found,
+        cli_total=cli_total,
+        server_running=server_running,
+        server_pid=server_pid,
+        ra_port=os.environ.get("RA_PORT", "5050"),
+        log_size=log_size,
+    )
+
+
+@app.route("/panel/settings")
+def panel_settings():
+    """HTMX partial: editable settings form for the right control panel."""
+    return render_template(
+        "_panel_settings.html",
+        secrets=settings_store.secret_status(),
+        fields=settings_store.editable_values(),
+        env_file=str(settings_store.env_path()),
+    )
+
+
+@app.route("/panel/settings/save", methods=["POST"])
+def panel_settings_save():
+    """HTMX endpoint: save settings from the right panel, return status inline."""
+    try:
+        path = settings_store.save(request.form.to_dict())
+        ok_msg = f"Saved to {path.name}"
+        return render_template(
+            "_panel_settings.html",
+            secrets=settings_store.secret_status(),
+            fields=settings_store.editable_values(),
+            env_file=str(settings_store.env_path()),
+            flash_ok=ok_msg,
+        )
+    except (ValueError, OSError) as exc:
+        return render_template(
+            "_panel_settings.html",
+            secrets=settings_store.secret_status(),
+            fields=settings_store.editable_values(),
+            env_file=str(settings_store.env_path()),
+            flash_error=str(exc),
+        )
+
+
+@app.route("/panel/providers")
+def panel_providers():
+    """HTMX partial: provider test cards for the right control panel."""
+    return render_template(
+        "_panel_providers.html",
+        cli_providers=cli_provider_status(),
+        api_providers=api_provider_status(),
+        models=MODELS,
+    )
+
+
 # ── Consolidated UI routes ───────────────────────────────────────────────────
 
 

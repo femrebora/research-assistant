@@ -1,0 +1,78 @@
+{# _panel_providers.html — Provider test cards for the right control panel.
+   Loaded via HTMX from /panel/providers. Test buttons post to /providers/test. #}
+
+<div class="panel-section">
+  <p class="section-label" style="margin-bottom:0.5rem;">API Providers</p>
+
+  {% for p in api_providers %}
+  <div class="provider-card" style="margin-bottom:0.5rem;padding:0.625rem;">
+    <div class="provider-card-header" style="margin-bottom:0.375rem;">
+      <div>
+        <div class="provider-name" style="font-size:0.8125rem;">{{ p.name }}</div>
+        <div class="provider-env" style="font-size:0.6875rem;">{{ p.env_var }}</div>
+      </div>
+      <span class="status-pill {{ 'status-pill-ok' if p.status == 'tested_ok' else 'status-pill-warn' if p.configured else 'status-pill-muted' if not p.configured else 'status-pill-danger' }}"
+            style="font-size:0.6875rem;">
+        <span class="status-dot {{ 'status-dot-ok' if p.status == 'tested_ok' else 'status-dot-warn' if p.configured else 'status-dot-muted' if not p.configured else 'status-dot-danger' }}"></span>
+        {% if p.status == 'tested_ok' %}Tested OK
+        {% elif p.status == 'tested_failed' %}Failed
+        {% elif p.status == 'rate_limited' %}Rate limited
+        {% elif p.status == 'unavailable' %}Unavailable
+        {% elif p.configured %}Key present
+        {% else %}Not configured{% endif %}
+      </span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.25rem;">
+      {% for alias in p.aliases %}
+      <form hx-post="/providers/test" hx-target="#test-result-{{ alias }}" hx-swap="innerHTML"
+            hx-indicator="#test-spinner-{{ alias }}" style="display:inline;">
+        <input type="hidden" name="alias" value="{{ alias }}">
+        <button type="submit" class="btn btn-secondary btn-sm"
+                style="font-size:0.6875rem;font-family:monospace;padding:0.1875rem 0.5rem;"
+                {% if not p.configured %}disabled{% endif %}>
+          {{ alias }}
+        </button>
+      </form>
+      <span id="test-spinner-{{ alias }}" class="spinner htmx-indicator" style="width:0.625rem;height:0.625rem;"></span>
+      {% endfor %}
+    </div>
+    <div id="test-result-{{ p.aliases[0] }}" style="margin-top:0.375rem;"></div>
+    {# A shared result area per provider #}
+    {% for alias in p.aliases %}
+    {% if alias != p.aliases[0] %}
+    <div id="test-result-{{ alias }}" style="margin-top:0.25rem;"></div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <p class="section-label" style="margin-bottom:0.5rem;margin-top:0.75rem;">CLI Providers</p>
+
+  {% for c in cli_providers %}
+  <div class="provider-card" style="margin-bottom:0.5rem;padding:0.625rem;">
+    <div class="provider-card-header" style="margin-bottom:0.375rem;">
+      <div>
+        <div class="provider-name" style="font-size:0.8125rem;">{{ c.alias }}</div>
+        <div class="provider-env" style="font-size:0.6875rem;">{{ c.command }} {% if c.version %}· {{ c.version[:50] }}{% endif %}</div>
+      </div>
+      <span class="status-pill {{ 'status-pill-ok' if c.found else 'status-pill-warn' }}"
+            style="font-size:0.6875rem;">
+        <span class="status-dot {{ 'status-dot-ok' if c.found else 'status-dot-warn' }}"></span>
+        {{ 'Installed' if c.found else 'Not found' }}
+      </span>
+    </div>
+    {% if c.found %}
+    <form hx-post="/providers/test" hx-target="#test-result-cli-{{ c.alias }}" hx-swap="innerHTML"
+          hx-indicator="#test-spinner-cli-{{ c.alias }}" style="display:inline;">
+      <input type="hidden" name="alias" value="{{ c.alias }}">
+      <button type="submit" class="btn btn-secondary btn-sm"
+              style="font-size:0.6875rem;font-family:monospace;padding:0.1875rem 0.5rem;">
+        Test {{ c.alias }}
+      </button>
+    </form>
+    <span id="test-spinner-cli-{{ c.alias }}" class="spinner htmx-indicator" style="width:0.625rem;height:0.625rem;"></span>
+    {% endif %}
+    <div id="test-result-cli-{{ c.alias }}" style="margin-top:0.375rem;"></div>
+  </div>
+  {% endfor %}
+</div>

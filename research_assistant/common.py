@@ -27,17 +27,31 @@ from litellm.exceptions import (
 load_dotenv()
 
 # Friendly model name -> LiteLLM model string.
-# Edit these to whatever current model versions you want to use.
+#
+# Every value can be overridden via an environment variable named
+# RA_MODEL_<ALIAS> (uppercase, hyphens → underscores).  For example:
+#   export RA_MODEL_CLAUDE="anthropic/claude-sonnet-4-6"  # downgrade Opus→Sonnet
+#   export RA_MODEL_GPT="openai/gpt-5.1"                  # newer GPT release
+#
+# This lets you keep models current without editing source code.
+# Set these in your .env file alongside your API keys.
+
+def _model(alias: str, default: str) -> str:
+    """Return the model string for *alias*, respecting RA_MODEL_<ALIAS> env overrides."""
+    env_var = "RA_MODEL_" + alias.upper().replace("-", "_")
+    return os.getenv(env_var, default)
+
+
 MODELS = {
-    "claude":   "anthropic/claude-opus-4-7",
-    "sonnet":   "anthropic/claude-sonnet-4-6",
-    "haiku":    "anthropic/claude-haiku-4-5",
-    "gemini":   "gemini/gemini-2.5-pro",
-    "flash":    "gemini/gemini-2.5-flash",
-    "deepseek": "deepseek/deepseek-chat",
-    "gpt":      "openai/gpt-5",
-    "gpt-mini": "openai/gpt-5-mini",
-    "codex":    "openai/gpt-5",
+    "claude":   _model("claude",   "anthropic/claude-opus-4-8"),
+    "sonnet":   _model("sonnet",   "anthropic/claude-sonnet-4-6"),
+    "haiku":    _model("haiku",    "anthropic/claude-haiku-4-5-20251001"),
+    "gemini":   _model("gemini",   "gemini/gemini-2.5-pro"),
+    "flash":    _model("flash",    "gemini/gemini-2.5-flash"),
+    "deepseek": _model("deepseek", "deepseek/deepseek-chat"),
+    "gpt":      _model("gpt",      "openai/gpt-5"),
+    "gpt-mini": _model("gpt-mini", "openai/gpt-5-mini"),
+    "codex":    _model("codex",    "openai/gpt-5"),
     # Local via Ollama (LiteLLM-managed). Override the model name with OLLAMA_MODEL.
     # Examples: ollama/llama3.3, ollama/qwen2.5, ollama/mistral-nemo.
     "local":    os.getenv("OLLAMA_MODEL", "ollama/llama3.3"),

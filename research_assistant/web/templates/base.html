@@ -128,9 +128,27 @@
                 </div>
 
                 <div class="flex items-center gap-3">
+                    {# Status indicator dots #}
+                    <div class="topbar-status">
+                        <button type="button" class="topbar-status-item"
+                                onclick="togglePanel();openPanelTab('providers');"
+                                title="Provider health — click to check">
+                            <span class="topbar-status-dot" id="topbar-dot-api"
+                                  style="background:var(--color-text-muted);"></span>
+                            <span>API</span>
+                        </button>
+                        <button type="button" class="topbar-status-item"
+                                onclick="togglePanel();openPanelTab('status');"
+                                title="Index status — click to view">
+                            <span class="topbar-status-dot" id="topbar-dot-index"
+                                  style="background:var(--color-text-muted);"></span>
+                            <span>Index</span>
+                        </button>
+                    </div>
+
                     {% if active_project %}
                     <a href="/projects/{{ active_project.slug }}" class="text-xs" style="color:var(--color-text-muted);text-decoration:none;">
-                        Project settings
+                        Project
                     </a>
                     {% endif %}
 
@@ -146,6 +164,13 @@
                                 onclick="setTheme('system')" aria-label="System theme" role="radio" aria-checked="false"
                                 title="System">💻</button>
                     </div>
+
+                    {# Control panel trigger #}
+                    <button type="button" class="panel-trigger"
+                            onclick="togglePanel()"
+                            title="Control Panel (Ctrl+\)" aria-label="Open control panel">
+                        ⚙️
+                    </button>
                 </div>
             </header>
 
@@ -157,6 +182,38 @@
             </main>
         </div>
     </div>
+
+    {# ── Right control panel ────────────────────────────────────────────── #}
+    <div class="panel-overlay" onclick="closePanel()"></div>
+
+    <aside class="control-panel" role="complementary" aria-label="Control panel">
+        {# Header with close button #}
+        <div class="panel-header">
+            <span class="panel-title">Control Panel</span>
+            <button type="button" class="panel-close" onclick="closePanel()" aria-label="Close panel">×</button>
+        </div>
+
+        {# Tab bar #}
+        <div class="panel-tab-bar">
+            <button type="button" class="panel-tab-btn active" data-panel-tab="status"
+                    onclick="openPanelTab('status')">Status</button>
+            <button type="button" class="panel-tab-btn" data-panel-tab="settings"
+                    onclick="openPanelTab('settings')">Settings</button>
+            <button type="button" class="panel-tab-btn" data-panel-tab="providers"
+                    onclick="openPanelTab('providers')">Providers</button>
+        </div>
+
+        {# Tab panels (content loaded lazily via HTMX) #}
+        <div class="panel-body">
+            <div id="panel-tab-status" class="panel-tab-panel active" role="tabpanel">
+                <div style="display:flex;justify-content:center;padding:2rem;">
+                    <span class="spinner"></span>
+                </div>
+            </div>
+            <div id="panel-tab-settings" class="panel-tab-panel" role="tabpanel"></div>
+            <div id="panel-tab-providers" class="panel-tab-panel" role="tabpanel"></div>
+        </div>
+    </aside>
 
     {# ── Shared JS utilities ────────────────────────────────────────────── #}
     <script>
@@ -186,11 +243,45 @@
         }
     });
 
-    // Close sidebar on Escape
+    // Initialize top bar status dots with live data
+    (function() {
+        fetch('/index/status').then(function(r) { return r.json(); }).then(function(state) {
+            var dot = document.getElementById('topbar-dot-index');
+            if (!dot) return;
+            if (state.stats && state.stats.documents > 0) {
+                dot.style.background = 'var(--color-success)';
+                dot.title = 'Index: ' + state.stats.documents + ' docs, ' + state.stats.chunks + ' chunks';
+            } else {
+                dot.style.background = 'var(--color-text-muted)';
+                dot.title = 'Index not built yet';
+            }
+        }).catch(function() {});
+
+        fetch('/stats').then(function(r) { return r.json(); }).then(function(data) {
+            var dot = document.getElementById('topbar-dot-api');
+            if (!dot) return;
+            fetch('/panel/status', {headers: {'HX-Request': 'false'}}).then(function(r) { return r.text(); }).then(function(html) {
+                var div = document.createElement('div');
+                div.innerHTML = html;
+                var okPills = div.querySelectorAll('.status-pill-ok').length;
+                var warnPills = div.querySelectorAll('.status-pill-warn').length;
+                if (okPills > 0) {
+                    dot.style.background = 'var(--color-success)';
+                    dot.title = okPills + ' provider(s) configured';
+                } else if (warnPills > 0) {
+                    dot.style.background = 'var(--color-warning)';
+                    dot.title = warnPills + ' provider(s) need attention';
+                }
+            }).catch(function() {});
+        }).catch(function() {});
+    })();
+
+    // Close sidebar on Escape (when panel is not open)
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+            var panelOpen = document.querySelector('.control-panel.open');
             var sidebar = document.querySelector('.app-sidebar');
-            if (sidebar && sidebar.classList.contains('open')) {
+            if (!panelOpen && sidebar && sidebar.classList.contains('open')) {
                 toggleSidebar();
             }
         }

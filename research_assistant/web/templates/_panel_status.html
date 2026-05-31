@@ -1,0 +1,104 @@
+{# _panel_status.html — System status overview for the right control panel.
+   Loaded via HTMX from /panel/status. Optimized for 380px panel width. #}
+
+<div class="panel-section">
+  {# ── Provider health ────────────────────────────────────────────────── #}
+  <p class="section-label" style="margin-bottom:0.5rem;">Providers</p>
+
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+    <span class="status-pill {{ 'status-pill-ok' if api_configured == api_total else 'status-pill-warn' if api_configured else 'status-pill-muted' }}">
+      <span class="status-dot {{ 'status-dot-ok' if api_configured == api_total else 'status-dot-warn' if api_configured else 'status-dot-muted' }}"></span>
+      API: {{ api_configured }}/{{ api_total }} configured
+    </span>
+    <span class="status-pill {{ 'status-pill-ok' if cli_found == cli_total else 'status-pill-warn' if cli_found else 'status-pill-muted' }}">
+      <span class="status-dot {{ 'status-dot-ok' if cli_found == cli_total else 'status-dot-warn' if cli_found else 'status-dot-muted' }}"></span>
+      CLI: {{ cli_found }}/{{ cli_total }} found
+    </span>
+  </div>
+
+  {# Per-provider detail #}
+  <div style="font-size:0.75rem;margin-bottom:1rem;">
+    {% for p in api_providers %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;border-bottom:1px solid var(--color-border);">
+      <span style="color:var(--color-text-secondary);">{{ p.name }}</span>
+      <span class="status-pill {{ 'status-pill-ok' if p.status == 'tested_ok' else 'status-pill-warn' if p.configured else 'status-pill-muted' if not p.configured else 'status-pill-danger' }}"
+            style="font-size:0.6875rem;">
+        {% if p.status == 'tested_ok' %}Tested OK
+        {% elif p.status == 'tested_failed' %}Test failed
+        {% elif p.status == 'rate_limited' %}Rate limited
+        {% elif p.status == 'unavailable' %}Unavailable
+        {% elif p.configured %}Key present
+        {% else %}Not configured{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+    {% for c in cli_providers %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.25rem 0;border-bottom:1px solid var(--color-border);">
+      <span style="color:var(--color-text-secondary);">{{ c.alias }}</span>
+      <span class="status-pill {{ 'status-pill-ok' if c.found else 'status-pill-muted' }}"
+            style="font-size:0.6875rem;">
+        {% if c.found %}{{ c.version[:40] if c.version else 'Installed' }}
+        {% else %}Not found{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# ── Vector index ───────────────────────────────────────────────────── #}
+  <p class="section-label" style="margin-bottom:0.5rem;">Vector Index</p>
+
+  {% if index_data.exists %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1rem;">
+    <div class="stat-card" style="padding:0.625rem;">
+      <div class="stat-card-label">Documents</div>
+      <div class="stat-card-value" style="font-size:1.125rem;">{{ index_data.documents }}</div>
+    </div>
+    <div class="stat-card" style="padding:0.625rem;">
+      <div class="stat-card-label">Chunks</div>
+      <div class="stat-card-value" style="font-size:1.125rem;">{{ index_data.chunks }}</div>
+    </div>
+  </div>
+  <div style="font-size:0.75rem;color:var(--color-text-muted);margin-bottom:1rem;">
+    Embedding: {{ index_data.embedding_model }}<br>
+    Last indexed: {{ index_data.last_indexed }}<br>
+    Chunk size: {{ index_data.chunk_size }}
+  </div>
+  {% else %}
+  <div style="padding:0.75rem;background:var(--color-surface-soft);border-radius:0.5rem;margin-bottom:1rem;">
+    <p style="font-size:0.8125rem;color:var(--color-text-secondary);margin:0 0 0.5rem 0;">
+      No vector index built yet. Index your Zotero PDFs to enable RAG search.
+    </p>
+    <a href="/index-setup" class="btn btn-primary btn-sm" style="text-decoration:none;">Set up index</a>
+  </div>
+  {% endif %}
+
+  {# ── Server ─────────────────────────────────────────────────────────── #}
+  <p class="section-label" style="margin-bottom:0.5rem;">Server</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.5rem;">
+    <div class="stat-card" style="padding:0.625rem;">
+      <div class="stat-card-label">Status</div>
+      <div style="display:flex;align-items:center;gap:0.375rem;margin-top:0.125rem;">
+        <span class="status-dot {{ 'status-dot-ok' if server_running else 'status-dot-muted' }}"></span>
+        <span style="font-size:0.875rem;font-weight:600;color:var(--color-text-primary);">
+          {{ 'Running' if server_running else 'Unknown' }}
+        </span>
+      </div>
+    </div>
+    <div class="stat-card" style="padding:0.625rem;">
+      <div class="stat-card-label">Port</div>
+      <div class="stat-card-value" style="font-size:1.125rem;">{{ ra_port }}</div>
+    </div>
+  </div>
+
+  {% if server_pid %}
+  <div style="font-size:0.75rem;color:var(--color-text-muted);">
+    PID: {{ server_pid }} · Log: {{ log_size }}
+  </div>
+  {% endif %}
+
+  <div style="margin-top:0.75rem;">
+    <a href="/providers" class="btn btn-secondary btn-sm" style="text-decoration:none;">Full providers page</a>
+    <a href="/index-setup" class="btn btn-secondary btn-sm" style="text-decoration:none;">Full index page</a>
+  </div>
+</div>

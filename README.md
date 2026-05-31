@@ -71,13 +71,18 @@ git clone https://github.com/femrebora/research-assistant
 cd research-assistant
 bash scripts/setup.sh
 bash scripts/install_cli.sh
-source ~/.bashrc
-ra
+research-assistant
 ```
 
 Your browser opens at `http://127.0.0.1:5050`.
 
-The setup script creates a Python virtual environment, installs the package, creates a `.env` file, and prepares default research folders. The install script adds the `ra` command to your shell.
+The setup script creates a Python virtual environment, installs the package, creates a `.env` file, and prepares default research folders.
+
+The install script copies a small wrapper to `~/.local/bin/research-assistant`. For the `ra` shortcut, add this line to your `~/.bashrc` (optional — the installer prints the exact line):
+
+```bash
+alias ra="research-assistant"
+```
 
 ### Start and stop
 
@@ -92,7 +97,9 @@ If something is wrong, run `ra doctor` for a full diagnostic report.
 
 ### How the shell configuration works
 
-The installer (`scripts/install_cli.sh`) adds two lines to your `~/.bashrc`. If you prefer to set them up by hand, here is exactly what they are and how to add them:
+The installer (`scripts/install_cli.sh`) copies a wrapper script to `~/.local/bin/research-assistant`. It does **not** modify your `~/.bashrc` — you control your own shell configuration.
+
+To use the `ra` shortcut, add these two lines to your shell config by hand:
 
 **1. Add `~/.local/bin` to your PATH** — so the `research-assistant` command can be found:
 
@@ -119,6 +126,10 @@ Paste the two lines above at the end, then save (`Ctrl+O`) and exit (`Ctrl+X`). 
 ```bash
 source ~/.bashrc
 ```
+
+#### If the project directory is moved or deleted
+
+The installed wrapper detects at runtime whether the project directory still exists. If you move or delete the repo, running `research-assistant` prints a clear error telling you what happened and how to fix it — instead of a cryptic "No such file" crash.
 
 #### If you use a different shell
 
@@ -273,6 +284,21 @@ GEMINI_API_KEY=...
 DEEPSEEK_API_KEY=sk-...
 OPENAI_API_KEY=sk-...
 ```
+
+### Changing which model each alias points to
+
+Each model alias can be overridden with an environment variable in your `.env` file. This lets you switch to newer models without editing source code:
+
+```bash
+# Override individual model IDs (LiteLLM format)
+RA_MODEL_CLAUDE=anthropic/claude-opus-4-8
+RA_MODEL_SONNET=anthropic/claude-sonnet-4-6
+RA_MODEL_GPT=openai/gpt-5
+RA_MODEL_GEMINI=gemini/gemini-2.5-pro
+# …and so on for every alias: haiku, flash, deepseek, gpt-mini, codex, local
+```
+
+The pattern is `RA_MODEL_<ALIAS>` where `<ALIAS>` is the model key in uppercase (hyphens become underscores).
 
 For Zotero integration, configure these values from `/settings` or directly in `.env`:
 
@@ -550,6 +576,63 @@ For sensitive work, use encrypted storage or a private backup location.
   </tbody>
 </table>
 
+## Complete uninstall
+
+To remove research-assistant from your system:
+
+### Automatic (if you still have the repo)
+
+```bash
+cd /path/to/research-assistant
+bash scripts/uninstall_cli.sh
+```
+
+This removes:
+- `~/.local/bin/research-assistant` (the CLI wrapper)
+- `~/.local/share/applications/research-assistant.desktop` (desktop launcher)
+- `~/.local/share/research-assistant/` (PID file and server logs)
+
+### Manual (if you deleted the repo already)
+
+```bash
+rm -f ~/.local/bin/research-assistant
+rm -f ~/.local/share/applications/research-assistant.desktop
+rm -rf ~/.local/share/research-assistant
+```
+
+### Clean up shell config
+
+If you previously added the `ra` alias or PATH line to `~/.bashrc`, open the file and remove them:
+
+```bash
+nano ~/.bashrc
+```
+
+Look for and delete these lines (if present):
+
+```bash
+# Added by research-assistant installer
+export PATH="$HOME/.local/bin:$PATH"
+alias ra="research-assistant"
+```
+
+### What is NOT removed (your research data)
+
+These directories contain YOUR work and are never touched by the uninstaller:
+
+| Directory | Contents |
+|---|---|
+| `~/thesis/` | Drafts, notes, outlines, sessions, logs |
+| `~/thesis/chroma_db/` | Vector index of your papers |
+| `~/.venvs/thesis/` | Python virtual environment |
+| `~/Zotero/storage/` | Your Zotero PDF library |
+
+To remove these as well (only if you're certain):
+
+```bash
+rm -rf ~/thesis ~/.venvs/thesis
+```
+
 ## Troubleshooting
 
 <table>
@@ -562,7 +645,11 @@ For sensitive work, use encrypted storage or a private backup location.
   <tbody>
     <tr>
       <td>The <code>ra</code> command is not found</td>
-      <td>Run <code>bash scripts/install_cli.sh</code> then <code>source ~/.bashrc</code>. Or see <a href="#how-the-shell-configuration-works">How the shell configuration works</a> to add the PATH and alias by hand with <code>nano ~/.bashrc</code>.</td>
+      <td>Run <code>bash scripts/install_cli.sh</code> then add the alias to <code>~/.bashrc</code> by hand. See <a href="#how-the-shell-configuration-works">How the shell configuration works</a> for exact instructions.</td>
+    </tr>
+    <tr>
+      <td><code>ra</code> or <code>research-assistant</code> gives "project directory not found"</td>
+      <td>The project was moved or deleted after installation. Run <code>rm ~/.local/bin/research-assistant</code> to remove the stale wrapper, then reinstall from the new location. See <a href="#complete-uninstall">Complete uninstall</a> for full cleanup.</td>
     </tr>
     <tr>
       <td>The Web UI does not start</td>

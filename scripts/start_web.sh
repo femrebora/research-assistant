@@ -47,24 +47,79 @@ elif command -v lsof &>/dev/null; then
 fi
 
 # ── Find Python environment ────────────────────────────────────────────
-# Try common virtualenv locations in order of preference
+# Search multiple locations in order of preference.  The first one that
+# has both Python AND Flask installed wins.
 PYTHON=""
+PYTHON_SOURCE=""
+
+# Candidate 1: project-local .venv
 if [ -f "$PROJECT_DIR/.venv/bin/python" ]; then
-    PYTHON="$PROJECT_DIR/.venv/bin/python"
-elif [ -f "$HOME/.venvs/thesis/bin/python" ]; then
-    PYTHON="$HOME/.venvs/thesis/bin/python"
-elif command -v python3 &>/dev/null; then
-    PYTHON="python3"
-else
-    echo "Error: Python not found. Please set up a virtual environment first:"
+    CANDIDATE="$PROJECT_DIR/.venv/bin/python"
+    if "$CANDIDATE" -c "import flask" 2>/dev/null; then
+        PYTHON="$CANDIDATE"
+        PYTHON_SOURCE="$PROJECT_DIR/.venv"
+    fi
+fi
+
+# Candidate 2: shared thesis venv
+if [ -z "$PYTHON" ] && [ -f "$HOME/.venvs/thesis/bin/python" ]; then
+    CANDIDATE="$HOME/.venvs/thesis/bin/python"
+    if "$CANDIDATE" -c "import flask" 2>/dev/null; then
+        PYTHON="$CANDIDATE"
+        PYTHON_SOURCE="$HOME/.venvs/thesis"
+    fi
+fi
+
+# Candidate 3: any other venv in common locations
+if [ -z "$PYTHON" ]; then
+    for venv_base in "$HOME/.venvs" "$HOME/.virtualenvs"; do
+        if [ -d "$venv_base" ]; then
+            for venv in "$venv_base"/*/; do
+                CANDIDATE="${venv}bin/python"
+                if [ -f "$CANDIDATE" ] && "$CANDIDATE" -c "import flask, research_assistant" 2>/dev/null; then
+                    PYTHON="$CANDIDATE"
+                    PYTHON_SOURCE="$venv"
+                    break 2
+                fi
+            done
+        fi
+    done
+fi
+
+# Candidate 4: system python3
+if [ -z "$PYTHON" ] && command -v python3 &>/dev/null; then
+    CANDIDATE="python3"
+    if "$CANDIDATE" -c "import flask, research_assistant" 2>/dev/null; then
+        PYTHON="$CANDIDATE"
+        PYTHON_SOURCE="system"
+    fi
+fi
+
+# Nothing found — give clear instructions
+if [ -z "$PYTHON" ]; then
+    echo "Error: Could not find a Python environment with Flask and research_assistant installed."
+    echo ""
+    echo "Tried these locations:"
+    echo "  • $PROJECT_DIR/.venv/bin/python"
+    echo "  • $HOME/.venvs/thesis/bin/python"
+    echo "  • Any venv under ~/.venvs/ or ~/.virtualenvs/"
+    echo "  • system python3"
+    echo ""
+    echo "To set up the environment, run:"
     echo "  bash $PROJECT_DIR/scripts/setup.sh"
     exit 1
 fi
 
-# Verify Flask is available
-if ! "$PYTHON" -c "import flask" 2>/dev/null; then
-    echo "Error: Flask not found in Python environment ($PYTHON)."
-    echo "Run: bash $PROJECT_DIR/scripts/setup.sh"
+echo "Using Python: $PYTHON ($PYTHON_SOURCE)"
+
+# ── Verify the package can be imported ─────────────────────────────────
+if ! "$PYTHON" -c "from research_assistant.web.app import app" 2>/dev/null; then
+    echo "Error: research_assistant package is installed but its web module failed to import."
+    echo ""
+    echo "Try reinstalling:"
+    echo "  cd $PROJECT_DIR"
+    echo "  source ${PYTHON_SOURCE}/bin/activate 2>/dev/null || true"
+    echo "  pip install -e ."
     exit 1
 fi
 
@@ -73,11 +128,10 @@ echo "Starting Research Assistant..."
 cd "$PROJECT_DIR"
 
 nohup "$PYTHON" -c "
-import os, sys
-sys.path.insert(0, '$PROJECT_DIR')
+import os
 os.environ.setdefault('RA_HOST', '$HOST')
 os.environ.setdefault('RA_PORT', '$PORT')
-from research_assistant.web.app import app, _cli
+from research_assistant.web.app import app
 app.run(host='$HOST', port=int('$PORT'), debug=False)
 " >> "$LOG_FILE" 2>&1 &
 
@@ -85,11 +139,7 @@ SERVER_PID=$!
 echo "$SERVER_PID" > "$PID_FILE"
 
 # ── Wait until the server actually accepts connections ─────────────────
-# Poll the port instead of guessing with a fixed sleep — Flask can take
-# several seconds to bind, and opening the browser too early lands the
-# user on a "connection refused" page.
 port_open() {
-    # Prefer a real TCP connect; fall back to ss/lsof if /dev/tcp is unavailable.
     if (exec 3<>"/dev/tcp/${HOST}/${PORT}") 2>/dev/null; then
         exec 3>&- 3<&- 2>/dev/null || true
         return 0
@@ -112,9 +162,8 @@ done
 if $READY; then
     echo ""
     echo "Research Assistant is running at http://${HOST}:${PORT}"
-    echo "To stop it, run: ra stop"
+    echo "To stop it, run: research-assistant stop"
     echo ""
-    # Open browser only once the server is actually responding.
     "$BROWSER" "http://${HOST}:${PORT}" 2>/dev/null || true
 else
     echo "Error: Server failed to start within the expected time. Recent log:"
@@ -122,6 +171,8 @@ else
     tail -n 20 "$LOG_FILE" 2>/dev/null | sed 's/^/  /'
     echo "  ----------------------------------------------------------------"
     echo "  Full log: $LOG_FILE"
+    echo ""
+    echo "Run 'research-assistant doctor' for a full diagnostic."
     kill "$SERVER_PID" 2>/dev/null || true
     rm -f "$PID_FILE"
     exit 1

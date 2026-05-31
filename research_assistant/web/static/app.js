@@ -137,4 +137,97 @@
     updateToggleUI(storedMode);
   });
 
+  /* ── Right control panel ─────────────────────────────────────────────── */
+  var panelState = { open: false, currentTab: 'status', loadedTabs: {} };
+
+  window.togglePanel = function () {
+    var panel = document.querySelector('.control-panel');
+    var overlay = document.querySelector('.panel-overlay');
+    var trigger = document.querySelector('.panel-trigger');
+    if (!panel || !overlay) return;
+
+    panelState.open = !panelState.open;
+    panel.classList.toggle('open', panelState.open);
+    overlay.classList.toggle('open', panelState.open);
+    if (trigger) trigger.classList.toggle('active', panelState.open);
+    document.body.style.overflow = panelState.open ? 'hidden' : '';
+
+    // Lazy-load first tab content on first open
+    if (panelState.open && !panelState.loadedTabs[panelState.currentTab]) {
+      openPanelTab(panelState.currentTab);
+    }
+  };
+
+  window.closePanel = function () {
+    var panel = document.querySelector('.control-panel');
+    var overlay = document.querySelector('.panel-overlay');
+    var trigger = document.querySelector('.panel-trigger');
+    if (!panel) return;
+
+    panelState.open = false;
+    panel.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+    if (trigger) trigger.classList.remove('active');
+    document.body.style.overflow = '';
+  };
+
+  window.openPanelTab = function (tabId) {
+    panelState.currentTab = tabId;
+
+    // Update tab buttons
+    document.querySelectorAll('.panel-tab-btn').forEach(function (btn) {
+      var isActive = btn.getAttribute('data-panel-tab') === tabId;
+      btn.classList.toggle('active', isActive);
+    });
+
+    // Show the correct tab panel
+    document.querySelectorAll('.panel-tab-panel').forEach(function (panel) {
+      panel.classList.toggle('active', panel.id === 'panel-tab-' + tabId);
+    });
+
+    // HTMX-load content if first time
+    if (!panelState.loadedTabs[tabId]) {
+      var target = document.getElementById('panel-tab-' + tabId);
+      if (!target) return;
+
+      var url;
+      switch (tabId) {
+        case 'status':     url = '/panel/status'; break;
+        case 'settings':   url = '/panel/settings'; break;
+        case 'providers':  url = '/panel/providers'; break;
+        default: return;
+      }
+
+      target.innerHTML = '<div style="display:flex;justify-content:center;padding:2rem;"><span class="spinner"></span></div>';
+      target.setAttribute('hx-get', url);
+      target.setAttribute('hx-trigger', 'load');
+      htmx.process(target);
+      panelState.loadedTabs[tabId] = true;
+    }
+  };
+
+  // Overlay click to close
+  document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('panel-overlay')) {
+      closePanel();
+    }
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function (e) {
+    // Escape closes the panel
+    if (e.key === 'Escape' && panelState.open) {
+      closePanel();
+      e.preventDefault();
+    }
+    // Ctrl+\ toggles the panel
+    if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+      togglePanel();
+      e.preventDefault();
+    }
+  });
+
+  // Close sidebar on Escape (moved to panel handler above — keep both working)
+  // The earlier Escape handler in base.html inline script handles sidebar.
+
 })();
