@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "research-assistant"
-version = "1.0.0"
+version = "1.2.0"
 description = "CLI toolkit + web/desktop UI for master's and PhD thesis research — RAG over your Zotero library, multi-model comparison, writing pipeline, and citation auditing."
 readme = "README.md"
 requires-python = ">=3.11"
