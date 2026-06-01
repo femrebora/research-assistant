@@ -17,33 +17,58 @@ import pytest
 class TestSettingsStore:
     """Tests for settings_store.py env parsing and validation."""
 
-    def test_editable_keys_no_secrets(self):
-        """Editable keys should never include secret API keys."""
-        from research_assistant.web.settings_store import EDITABLE_KEYS, SECRET_KEYS
+    def test_api_keys_are_editable_secrets(self):
+        """API keys are intentionally editable from the UI, and flagged secret.
 
-        # No editable key should be a secret API key ending in _API_KEY
-        for key in EDITABLE_KEYS:
-            assert key not in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY",
-                               "DEEPSEEK_API_KEY", "OPENAI_API_KEY",
-                               "ZOTERO_API_KEY"), \
-                f"Secret key {key} should not be in EDITABLE_KEYS"
+        They live in EDITABLE_KEYS (so the browser can set them) *and* in
+        SECRET_EDITABLE_KEYS (so the loopback guard knows to protect them).
+        """
+        from research_assistant.web.settings_store import (
+            EDITABLE_KEYS,
+            SECRET_EDITABLE_KEYS,
+        )
 
-    def test_save_rejects_secrets(self):
-        """save() should silently ignore secret keys in updates."""
+        for key in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY",
+                    "OPENAI_API_KEY", "ZOTERO_API_KEY"):
+            assert key in EDITABLE_KEYS, f"{key} should be editable from the UI"
+            assert key in SECRET_EDITABLE_KEYS, f"{key} should be a guarded secret"
+
+    def test_save_writes_secrets_on_loopback(self):
+        """On a loopback host, validate() keeps submitted API keys."""
+        from research_assistant.web.settings_store import validate
+
         updates = {
             "THESIS_ROOT": "/tmp/test-thesis",
-            "ANTHROPIC_API_KEY": "sk-ant-attempt-to-write-secret",
+            "ANTHROPIC_API_KEY": "sk-ant-set-from-localhost",
         }
-        # Should not raise, and should only write THESIS_ROOT
-        with (
-            mock.patch.object(Path, "exists", return_value=False),
-            mock.patch.object(Path, "write_text"),
-            mock.patch.object(Path, "mkdir"),
-        ):
-            from research_assistant.web.settings_store import validate
+        with mock.patch.dict(os.environ, {"RA_HOST": "127.0.0.1"}):
             clean = validate(updates)
-            assert "THESIS_ROOT" in clean
-            assert "ANTHROPIC_API_KEY" not in clean
+        assert clean["THESIS_ROOT"] == "/tmp/test-thesis"
+        assert clean["ANTHROPIC_API_KEY"] == "sk-ant-set-from-localhost"
+
+    def test_save_rejects_secrets_when_network_exposed(self):
+        """When RA_HOST is non-loopback, secret writes are refused."""
+        from research_assistant.web.settings_store import validate
+
+        updates = {
+            "THESIS_ROOT": "/tmp/test-thesis",
+            "ANTHROPIC_API_KEY": "sk-ant-attempt-over-network",
+        }
+        with (
+            mock.patch.dict(os.environ, {"RA_HOST": "0.0.0.0"}),
+            pytest.raises(ValueError, match="non-loopback host"),
+        ):
+            validate(updates)
+
+    def test_blank_secret_field_is_allowed_when_network_exposed(self):
+        """A blank API-key field means 'keep current' and never trips the guard."""
+        from research_assistant.web.settings_store import validate
+
+        updates = {"THESIS_ROOT": "/tmp/test-thesis", "ANTHROPIC_API_KEY": ""}
+        with mock.patch.dict(os.environ, {"RA_HOST": "0.0.0.0"}):
+            clean = validate(updates)
+        assert clean["THESIS_ROOT"] == "/tmp/test-thesis"
+        assert "ANTHROPIC_API_KEY" not in clean
 
     def test_secret_status_never_reveals_values(self):
         """secret_status() must never include the actual secret value."""
@@ -93,8 +118,8 @@ class TestZoteroPathExpansion:
         (subdir / "paper.pdf").write_text("PDF content")
 
         with mock.patch.dict(os.environ, {"ZOTERO_STORAGE": str(storage)}):
-            from research_assistant.workspace.library import _resolve_zotero_storage
-            result = _resolve_zotero_storage()
+            from research_assistant.workspace.library import zotero_storage
+            result = zotero_storage()
             if result:
                 assert result.exists()
                 pdfs = list(result.rglob("*.pdf"))

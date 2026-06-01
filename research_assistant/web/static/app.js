@@ -230,4 +230,52 @@
   // Close sidebar on Escape (moved to panel handler above — keep both working)
   // The earlier Escape handler in base.html inline script handles sidebar.
 
+  /* ── Provider test debounce ─────────────────────────────────────────────── */
+  var _providerTestTimer = null;
+
+  window.testAllProviders = function () {
+    var btn = document.querySelector('[onclick="testAllProviders()"]');
+    if (!btn || btn.disabled) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+
+    var forms = document.querySelectorAll('form[hx-post="/providers/test"]');
+    forms.forEach(function (form, i) {
+      setTimeout(function () {
+        htmx.trigger(form, 'submit');
+      }, i * 350); // stagger by 350ms to avoid rate-limit storms
+    });
+
+    // Re-enable after all requests have had time to complete
+    setTimeout(function () {
+      btn.disabled = false;
+      btn.textContent = 'Test all providers';
+    }, forms.length * 350 + 15000);
+  };
+
+  // Debounce individual provider test clicks (HTMX submit)
+  document.addEventListener('htmx:beforeRequest', function (e) {
+    var el = e.detail.elt;
+    if (el.getAttribute('hx-post') !== '/providers/test') return;
+
+    var btn = el.querySelector('button[type="submit"]');
+    if (!btn) return;
+
+    if (btn.disabled) {
+      e.preventDefault();
+      return;
+    }
+
+    btn.disabled = true;
+    var origText = btn.textContent;
+    btn.textContent = 'Testing…';
+
+    // Re-enable after a reasonable timeout
+    setTimeout(function () {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }, 20000);
+  });
+
 })();

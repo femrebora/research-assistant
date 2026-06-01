@@ -202,7 +202,11 @@ function testZoteroAPI() {
             </div>
         {% else %}
             <div class="alert alert-info">
-                No index built yet. Click the button below to create one from your PDFs.
+                <strong>No index built yet.</strong> Click the button below to create one from your PDFs.
+                <p style="margin-top:0.5rem;font-size:0.875rem;">
+                    The first index may take several minutes depending on how many PDFs you have.
+                    Subsequent indexing runs are faster — only new or changed files are processed.
+                </p>
             </div>
         {% endif %}
     </div>

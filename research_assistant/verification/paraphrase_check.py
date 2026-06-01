@@ -28,11 +28,11 @@ from rich.table import Table
 
 from research_assistant.common import read_file
 from research_assistant.researcher import (
-    CHROMA_DIR,
     DEFAULT_EMBED_MODEL,
     _embed_single,
     _get_collection,
     _get_index_meta,
+    chroma_dir,
 )
 
 console = Console()
@@ -108,7 +108,7 @@ def find_near_matches(
 @click.option("--show-source", is_flag=True,
               help="Print the matched source excerpt next to each flagged paragraph.")
 def main(draft_file, threshold, top, min_chars, embedding_model, as_json, show_source):
-    if not CHROMA_DIR.exists():
+    if not chroma_dir().exists():
         console.print("[red]No index found. Run './researcher.py index' first.[/red]")
         sys.exit(1)
 

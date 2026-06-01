@@ -1,9 +1,11 @@
 """Tests for the /settings page: render, save, and secret-write defense.
 
-The settings page is a hybrid surface: secrets are read-only masked status,
-while editable config keys (paths, CLI commands, timeouts) can be changed
-and written back to .env. This test suite uses a temporary .env so the
-real user config is never touched.
+The settings page is a hybrid surface: secrets that are also in the
+editable allow-list (model API keys, Zotero credentials) can be set from
+the browser only when the server is on a loopback host; non-loopback hosts
+reject secret writes.  Plain editable keys (paths, CLI commands, timeouts)
+can always be changed and written back to .env.  This test suite uses a
+temporary .env so the real user config is never touched.
 """
 from __future__ import annotations
 
@@ -52,15 +54,17 @@ def test_editable_fields_are_well_known():
 
 
 @pytest.mark.unit
-def test_validate_drops_secrets():
-    """validate() silently removes any key not in the editable allow-list."""
-    editable_keys = {f.key for f in EDITABLE_FIELDS}
-    payload = {"THESIS_ROOT": "/tmp/test"}
-    if "ANTHROPIC_API_KEY" not in editable_keys:
-        payload["ANTHROPIC_API_KEY"] = "sk-injected"
+def test_validate_drops_non_editable_secrets():
+    """validate() silently removes any key not in the editable allow-list.
+
+    SERPAPI_API_KEY is a known secret that is NOT user-editable from the
+    browser, so it must always be stripped by validate().
+    """
+    assert "SERPAPI_API_KEY" not in {f.key for f in EDITABLE_FIELDS}
+    payload = {"THESIS_ROOT": "/tmp/test", "SERPAPI_API_KEY": "sk-injected"}
     cleaned = validate(payload)
     assert "THESIS_ROOT" in cleaned
-    assert "ANTHROPIC_API_KEY" not in cleaned
+    assert "SERPAPI_API_KEY" not in cleaned
 
 
 @pytest.mark.unit
@@ -112,34 +116,76 @@ def test_settings_page_renders(client):
 
 
 @pytest.mark.integration
-def test_settings_post_saves_editable_and_preserves_secrets(temp_dotenv):
-    """POST /settings saves editable keys; secrets are untouched."""
+def test_settings_post_saves_editable_and_secret_on_loopback(temp_dotenv):
+    """On localhost, POST /settings saves editable paths AND API keys.
+
+    Editing API keys in-browser is an intentional feature; it is only allowed
+    when the server is bound to a loopback host (the default).
+    """
     client = _make_client()
 
-    # Round-trip: save a new THESIS_ROOT
-    response = client.post(
-        "/settings",
-        data={
-            "THESIS_ROOT": "/tmp/new-thesis-path",
-            # Attacker tries to inject a secret
-            "ANTHROPIC_API_KEY": "sk-ATTACKER-INJECTED",
-        },
-        follow_redirects=True,
-    )
+    with mock.patch.dict(os.environ, {"RA_HOST": "127.0.0.1"}):
+        response = client.post(
+            "/settings",
+            data={
+                "THESIS_ROOT": "/tmp/new-thesis-path",
+                "ANTHROPIC_API_KEY": "sk-ant-set-from-localhost",
+            },
+            follow_redirects=True,
+        )
     assert response.status_code == 200
 
-    # Read the .env file back
     saved = Path(temp_dotenv).read_text()
 
-    # Editable key was updated
+    # Editable path was updated
     assert "THESIS_ROOT=/tmp/new-thesis-path" in saved
-
-    # Original secret was preserved verbatim
-    assert "ANTHROPIC_API_KEY=sk-test-secret-123" in saved
+    # The API key the user typed was written in place
+    assert "ANTHROPIC_API_KEY=sk-ant-set-from-localhost" in saved
+    assert "ANTHROPIC_API_KEY=sk-test-secret-123" not in saved
+    # An untouched secret is preserved verbatim
     assert "GEMINI_API_KEY=gk-other-secret" in saved
 
-    # Attacker injection was rejected
-    assert "sk-ATTACKER-INJECTED" not in saved
+
+@pytest.mark.integration
+def test_settings_post_blank_secret_preserves_existing(temp_dotenv):
+    """A blank API-key field means 'keep current' — the existing value stays."""
+    client = _make_client()
+
+    with mock.patch.dict(os.environ, {"RA_HOST": "127.0.0.1"}):
+        response = client.post(
+            "/settings",
+            data={"THESIS_ROOT": "/tmp/new-thesis-path", "ANTHROPIC_API_KEY": ""},
+            follow_redirects=True,
+        )
+    assert response.status_code == 200
+
+    saved = Path(temp_dotenv).read_text()
+    assert "THESIS_ROOT=/tmp/new-thesis-path" in saved
+    # Untouched secret preserved verbatim
+    assert "ANTHROPIC_API_KEY=sk-test-secret-123" in saved
+
+
+@pytest.mark.integration
+def test_settings_post_rejects_secret_when_network_exposed(temp_dotenv):
+    """When RA_HOST is non-loopback, a secret write is refused and shown as error."""
+    client = _make_client()
+
+    with mock.patch.dict(os.environ, {"RA_HOST": "0.0.0.0"}):
+        response = client.post(
+            "/settings",
+            data={
+                "THESIS_ROOT": "/tmp/new-thesis-path",
+                "ANTHROPIC_API_KEY": "sk-ant-attempt-over-network",
+            },
+            follow_redirects=True,
+        )
+    assert response.status_code == 200
+
+    saved = Path(temp_dotenv).read_text()
+    # Nothing was written — validate() raised before the file was touched
+    assert "sk-ant-attempt-over-network" not in saved
+    assert "ANTHROPIC_API_KEY=sk-test-secret-123" in saved
+    assert "THESIS_ROOT=/tmp/new-thesis-path" not in saved
 
 
 @pytest.mark.integration

@@ -123,6 +123,27 @@ EDITABLE_FIELDS: tuple[EditableField, ...] = (
 
 EDITABLE_KEYS: frozenset[str] = frozenset(f.key for f in EDITABLE_FIELDS)
 
+# Secret keys that are also user-editable (the model/Zotero API keys). These may
+# only be written from the browser when the server is bound to a loopback
+# interface — see :func:`_is_loopback_host`.
+SECRET_EDITABLE_KEYS: frozenset[str] = EDITABLE_KEYS & frozenset(SECRET_KEYS)
+
+# Hosts considered local-only. When RA_HOST is one of these, the Settings page
+# is reachable only from this machine, so editing secrets in-browser is safe.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset(
+    {"", "127.0.0.1", "localhost", "::1", "0:0:0:0:0:0:0:1"}
+)
+
+
+def _is_loopback_host() -> bool:
+    """True when the web server is bound to a loopback interface.
+
+    Editing secret API keys from the browser is only safe on loopback; when the
+    app is exposed on the network (e.g. ``RA_HOST=0.0.0.0``) a LAN peer could
+    overwrite the keys, so :func:`validate` refuses secret writes in that case.
+    """
+    return os.getenv("RA_HOST", "").strip().lower() in _LOOPBACK_HOSTS
+
 
 def env_path() -> Path:
     """Resolve the .env file to read/write.
@@ -201,10 +222,20 @@ def editable_values() -> list[dict]:
 
 
 def _format_value(value: str) -> str:
-    """Quote a .env value when it contains characters that need protection."""
-    if value == "" or all(c not in value for c in ' \t#"\''):
+    """Quote a .env value when it contains characters that need protection.
+
+    Newlines and carriage returns are escaped (not left literal) so a pasted
+    value can never corrupt the line-oriented .env structure.
+    """
+    specials = ' \t#"\'\n\r'
+    if value == "" or all(c not in value for c in specials):
         return value
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    escaped = (
+        value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+    )
     return f'"{escaped}"'
 
 
@@ -218,6 +249,24 @@ def validate(updates: dict[str, str]) -> dict[str, str]:
     numeric_keys = {f.key for f in EDITABLE_FIELDS if f.kind == "number"}
     password_keys = {f.key for f in EDITABLE_FIELDS if f.kind == "password"}
     masked_sentinels = {"••••••••", "********", ""}
+
+    # Network-exposure guard: never write secret API keys from the browser when
+    # the server is reachable off-host. Only a non-blank change is rejected — a
+    # blank field still means "keep the current key" and is harmless.
+    if not _is_loopback_host():
+        attempted_secrets = sorted(
+            key
+            for key in updates
+            if key in SECRET_EDITABLE_KEYS
+            and (updates.get(key) or "").strip() not in masked_sentinels
+        )
+        if attempted_secrets:
+            raise ValueError(
+                "Refusing to set API keys from the web UI while the server is "
+                "exposed on a non-loopback host (RA_HOST is not 127.0.0.1). "
+                "Edit the .env file directly, or set RA_HOST=127.0.0.1 and "
+                "restart. Rejected: " + ", ".join(attempted_secrets) + "."
+            )
 
     clean: dict[str, str] = {}
     for key, raw in updates.items():
@@ -266,8 +315,14 @@ def save(updates: dict[str, str]) -> Path:
         for key in appended:
             new_lines.append(f"{key}={_format_value(clean[key])}")
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    except OSError as exc:
+        raise OSError(
+            f"Could not write settings to {path}: {exc}. "
+            "Check that the file and its folder are writable."
+        ) from exc
 
     # Reflect immediately so the page re-renders with the saved values.
     for key, value in clean.items():

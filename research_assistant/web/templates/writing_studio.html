@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/ui.html" import help_tooltip, card, page_header, alert with context %}
+{% from "macros/ui.html" import help_tooltip, card, page_header, alert, empty_state, error_state with context %}
 {% block content %}
 
 {{ page_header("Writing Studio", "Turn evidence into outlines, paragraph angles, drafts, critiques, and meaning‑checked revisions.") }}
@@ -332,6 +332,10 @@
 </div>
 {% endif %}
 
-<div id="writing-result"></div>
+<div id="writing-result">
+    {% if not task %}
+        {{ empty_state("Choose a writing task", "Select a task from the dropdown above to get started — brainstorm angles, build an outline, draft from evidence, or get a critique.") }}
+    {% endif %}
+</div>
 
 {% endblock %}

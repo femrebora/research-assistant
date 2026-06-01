@@ -21,13 +21,13 @@ from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from research_assistant.common import MODELS, ask_model
 from research_assistant.researcher import (
-    CHROMA_DIR,
     DEFAULT_K,
     DEFAULT_THRESHOLD,
     SESSION_DIR,
     _get_collection,
     _get_index_stats,
     ask_research_question,
+    chroma_dir,
     compare_research_question,
 )
 from research_assistant.researcher import (
@@ -58,6 +58,36 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
 
 
+def _warn_missing_config() -> None:
+    """Log a one-time advisory about missing config detected at startup.
+
+    Does NOT crash — the app stays usable and the user can fix config
+    later via the Settings page or ``ra doctor``.
+    """
+    missing: list[str] = []
+
+    if not os.getenv("ZOTERO_STORAGE", "").strip():
+        missing.append("ZOTERO_STORAGE")
+    if not os.getenv("ZOTERO_USER_ID", "").strip():
+        missing.append("ZOTERO_USER_ID")
+    if not os.getenv("ZOTERO_API_KEY", "").strip():
+        missing.append("ZOTERO_API_KEY")
+
+    provider_keys = [
+        "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
+        "DEEPSEEK_API_KEY",
+    ]
+    missing.extend(k for k in provider_keys if not os.getenv(k, "").strip())
+
+    if missing:
+        logger.warning(
+            "Missing configuration: %s. "
+            "Set these in .env, the Settings page (http://127.0.0.1:5050/settings), "
+            "or run 'ra doctor' for diagnostics.",
+            ", ".join(missing),
+        )
+
+
 @app.template_filter("safe_nl2br")
 def _safe_nl2br(text: str) -> str:
     """Escape HTML, then convert newlines to <br> tags."""
@@ -73,6 +103,7 @@ def _inject_nav():
     try:
         active_project = projects_mod.get_active_project()
     except Exception:
+        logger.exception("_inject_nav: get_active_project failed")
         active_project = None
     return {
         "tool_groups": specs_by_category(),
@@ -81,6 +112,11 @@ def _inject_nav():
     }
 
 logger = logging.getLogger("research-assistant")
+
+# Emit a one-time advisory about missing config detected at startup.
+# Does NOT crash — the app stays usable; the user can fix config via
+# the Settings page or `ra doctor`.
+_warn_missing_config()
 
 # PaperForge multi-agent pipeline UI (code->paper and topic->review).
 # Registered as a blueprint so /paperforge lives in the same app + nav.
@@ -121,7 +157,7 @@ def _get_index_state():
 
 def _get_index_data():
     """Get current index stats for the UI."""
-    if not CHROMA_DIR.exists():
+    if not chroma_dir().exists():
         return {"exists": False, "documents": 0, "chunks": 0}
     try:
         collection = _get_collection()
@@ -959,7 +995,7 @@ def panel_settings_save():
         path_keys = {"THESIS_ROOT", "ZOTERO_STORAGE", "THESIS_DOCS"}
         changed_paths = path_keys & set(request.form.to_dict().keys())
         if changed_paths:
-            ok_msg = f"Saved. Restart for path changes to apply."
+            ok_msg = "Saved. Restart for path changes to apply."
         else:
             ok_msg = f"Saved to {path.name}"
         return render_template(
@@ -1037,6 +1073,7 @@ def ask_library():
                     if save_name:
                         save_research_session(save_name, question, result)
                 except Exception as e:
+                    logger.exception("ask_library RAG query failed: %s", e)
                     result = {"answer": f"Error: {e}", "sources": [], "model": model,
                               "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
 
@@ -1055,6 +1092,7 @@ def ask_library():
                     if save_name:
                         save_research_session(save_name, question, result)
                 except Exception as e:
+                    logger.exception("ask_library single-model query failed: %s", e)
                     result = {"answer": f"Error: {e}", "sources": [], "model": model,
                               "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
 
@@ -1092,6 +1130,7 @@ def ask_library():
                                                    "output_tokens": r.get("output_tokens", 0),
                                                    "cost": r.get("cost", 0.0)}
                                 except Exception as e:
+                                    logger.exception("ask_library compare model %s failed: %s", m, e)
                                     outcomes[m] = {"answer": f"Error: {e}", "model": m,
                                                    "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
                     if save_name:
@@ -1101,6 +1140,7 @@ def ask_library():
                         except Exception as e:
                             logger.warning("Failed to save comparison session: %s", e)
                 except Exception as e:
+                    logger.exception("ask_library compare failed: %s", e)
                     outcomes = {"error": {"answer": str(e), "model": "", "input_tokens": 0,
                                           "output_tokens": 0, "cost": 0.0}}
 
@@ -1128,10 +1168,12 @@ def library_search():
         try:
             results = lib_mod.search(query, field=field)
         except Exception:
+            logger.exception("library_search failed for query=%r field=%r", query, field)
             results = []
     try:
         pdfs = lib_mod.list_pdfs()
     except Exception:
+        logger.exception("library_search list_pdfs failed")
         pdfs = []
     return render_template(
         "library_search.html", query=query, field=field,
@@ -1290,8 +1332,8 @@ def index_diagnostics():
     diag = {
         "platform": platform.platform(),
         "python": sys.version,
-        "chroma_dir": str(CHROMA_DIR),
-        "chroma_dir_exists": CHROMA_DIR.exists(),
+        "chroma_dir": str(chroma_dir()),
+        "chroma_dir_exists": chroma_dir().exists(),
         "index": index_data,
         "index_state": {k: v for k, v in state.items() if k != "error"},
         "env": env_vars,

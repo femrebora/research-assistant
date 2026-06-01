@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/ui.html" import empty_state, error_state with context %}
 {% block content %}
 <div class="mb-5">
     <p class="text-xs uppercase tracking-wider text-slate-400">{{ spec.category|capitalize }}</p>
@@ -109,7 +110,9 @@
     </form>
 </div>
 
-<div id="tool-result"></div>
+<div id="tool-result">
+    {{ empty_state("Ready", "Fill in the form above and submit to see results here.") }}
+</div>
 
 <style>
     .htmx-indicator { display: none; }
