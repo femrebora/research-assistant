@@ -5,6 +5,11 @@
   {% if flash_ok %}
   <div class="alert alert-success" style="margin-bottom:0.75rem;font-size:0.8125rem;">
     ✓ {{ flash_ok }}
+    {% if needs_restart %}
+    <div style="margin-top:0.5rem;">
+      <code style="background:var(--color-surface-soft);padding:0.125rem 0.375rem;border-radius:0.25rem;font-size:0.75rem;">ra restart</code>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
   {% if flash_error %}

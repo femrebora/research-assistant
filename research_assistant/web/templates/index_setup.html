@@ -122,18 +122,19 @@ function autoDetectZotero() {
         </div>
         <div style="display:flex;gap:0.5rem;">
             <button type="submit" class="btn btn-primary">Save credentials</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="testZoteroAPI()">Test Zotero API</button>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    hx-post="/index/zotero-test"
+                    hx-target="#zotero-test-result"
+                    hx-indicator="#zotero-test-spinner"
+                    onclick="this.disabled=true;this.textContent='Testing…';setTimeout(()=>{this.disabled=false;this.textContent='Test Zotero API'},10000)">
+                Test Zotero API
+            </button>
+            <span id="zotero-test-spinner" class="spinner htmx-indicator" style="width:0.75rem;height:0.75rem;"></span>
             <a href="?step=4" class="btn btn-secondary">Skip for now</a>
         </div>
     </form>
+    <div id="zotero-test-result" style="margin-top:0.75rem;"></div>
 </div>
-
-<script>
-function testZoteroAPI() {
-    alert('Zotero API test will be performed server-side. Check results below.');
-    // In the future, this will be an HTMX endpoint
-}
-</script>
 {% endif %}
 
 {# ── Step 4: Scan PDFs ─────────────────────────────────────────────────── #}
@@ -174,7 +175,23 @@ function testZoteroAPI() {
 {% if step == 5 %}
 <div class="card card-padded mb-6">
     <h3 class="card-title" style="margin-bottom:0.25rem;">Step 5: Build or rebuild index</h3>
-    <p class="form-helper">The index turns your PDFs into searchable passages. After indexing, Ask Library can retrieve evidence from your own Zotero papers.</p>
+    <p class="form-helper">The index turns your PDFs into searchable passages. After indexing, Ask Library can retrieve evidence from your own papers.</p>
+
+    {# ── Indexing mode indicator ─────────────────────────────────────────── #}
+    {% if not zotero_api_available %}
+    <div class="alert alert-info" style="margin-top:0.75rem;">
+        <strong>📄 Local PDF mode</strong> — No Zotero API credentials configured.
+        Indexing will scan your storage folder for PDF files and extract text from them.
+        <strong>Paper titles and authors will come from filenames, not your Zotero library.</strong>
+        <a href="?step=3" style="display:inline-block;margin-top:0.375rem;color:var(--color-primary);">Add Zotero credentials →</a>
+    </div>
+    {% else %}
+    <div class="alert alert-info" style="margin-top:0.75rem;">
+        <strong>🔬 Zotero API mode</strong> — Credentials configured.
+        Indexing will fetch paper metadata (titles, authors, citekeys) from your Zotero library.
+        Check "Index local PDFs only" below to skip the API and scan files directly.
+    </div>
+    {% endif %}
 
     <div id="index-status" style="margin:1rem 0;">
         {% if index_state and index_state.running %}
@@ -266,12 +283,11 @@ function testZoteroAPI() {
         </div>
     </form>
     <p class="form-helper" style="margin-top:0.75rem;">
-        {% if not zotero_api_available %}
-        <strong>No Zotero API configured.</strong> Indexing will scan for PDFs in your storage folder.
-        <a href="?step=3">Add Zotero credentials</a> for richer metadata (titles, authors, citekeys).
-        {% else %}
+        {% if zotero_api_available %}
         Rebuild the index when you add many new PDFs or change embedding settings.
         {% endif %}
+        If you change <code>ZOTERO_STORAGE</code> or <code>THESIS_ROOT</code> in Settings,
+        run <code style="background:var(--color-surface-soft);padding:0.125rem 0.375rem;border-radius:0.25rem;">ra restart</code> for the new paths to take effect.
     </p>
 </div>
 

@@ -197,12 +197,15 @@ def _run_index_in_background(collection_name: str | None, limit: int | None, for
 
         if use_local or not can_use_zotero:
             if not can_use_zotero and not use_local:
-                console_msg = "Zotero API not configured — indexing local PDFs instead."
+                with _index_lock:
+                    _index_state["status"] = "Scanning local PDFs (no Zotero API configured)"
             else:
-                console_msg = "Indexing local PDFs..."
-            print(console_msg)
+                with _index_lock:
+                    _index_state["status"] = "Scanning local PDFs..."
             stats = index_local_pdfs(pdf_dir=pdf_dir, force=force)
         else:
+            with _index_lock:
+                _index_state["status"] = "Fetching from Zotero API..."
             stats = index_zotero_papers(
                 collection_name=collection_name,
                 limit=limit,
@@ -215,7 +218,25 @@ def _run_index_in_background(collection_name: str | None, limit: int | None, for
         # index_* calls sys.exit(1) on fatal config errors — capture as error state
         with _index_lock:
             if not _index_state["error"]:
-                _index_state["error"] = "Indexing failed — check your configuration (ZOTERO_STORAGE, API keys, or PDF directory)."
+                if not os.environ.get("ZOTERO_STORAGE", "").strip():
+                    hint = (
+                        "ZOTERO_STORAGE is not set. "
+                        "Go to Settings → Zotero storage and set the path to "
+                        "your Zotero PDF folder (e.g. /home/you/Zotero/storage)."
+                    )
+                elif not can_use_zotero and not use_local:
+                    hint = (
+                        "No Zotero API credentials and no PDFs found. "
+                        "Either add your Zotero user ID and API key in Step 3, "
+                        "or check that your storage folder contains PDF files."
+                    )
+                else:
+                    hint = (
+                        "Indexing failed. Check your configuration: "
+                        "ZOTERO_STORAGE path, Zotero API keys, and that "
+                        "the folder contains PDF files."
+                    )
+                _index_state["error"] = hint
             _index_state["status"] = "error"
     except Exception as e:
         with _index_lock:
@@ -897,7 +918,9 @@ def settings_page():
                 flash_ok = (
                     f"Saved to {path.name}. "
                     "API keys take effect immediately. "
-                    "Restart ra-web for path changes to take full effect."
+                    "Path changes need a restart — run <code>ra restart</code> "
+                    "from your terminal, or open the status panel (Ctrl+\\) "
+                    "and click Restart."
                 )
             else:
                 flash_ok = f"Saved to {path.name}. All changes take effect immediately."
@@ -984,6 +1007,7 @@ def panel_settings():
         secrets=settings_store.secret_status(),
         fields=settings_store.editable_values(),
         env_file=str(settings_store.env_path()),
+        needs_restart=False,
     )
 
 
@@ -994,8 +1018,9 @@ def panel_settings_save():
         path = settings_store.save(request.form.to_dict())
         path_keys = {"THESIS_ROOT", "ZOTERO_STORAGE", "THESIS_DOCS"}
         changed_paths = path_keys & set(request.form.to_dict().keys())
-        if changed_paths:
-            ok_msg = "Saved. Restart for path changes to apply."
+        needs_restart = bool(changed_paths)
+        if needs_restart:
+            ok_msg = "Saved. Run <code>ra restart</code> for path changes to apply."
         else:
             ok_msg = f"Saved to {path.name}"
         return render_template(
@@ -1004,6 +1029,7 @@ def panel_settings_save():
             fields=settings_store.editable_values(),
             env_file=str(settings_store.env_path()),
             flash_ok=ok_msg,
+            needs_restart=needs_restart,
         )
     except (ValueError, OSError) as exc:
         return render_template(
@@ -1255,6 +1281,41 @@ def index_setup():
         diagnostics=diagnostics,
         zotero_api_available=zotero_api_available,
     )
+
+
+@app.route("/index/zotero-test", methods=["POST"])
+def index_zotero_test():
+    """HTMX endpoint: test Zotero API connectivity and return a status fragment."""
+    zotero_user = os.environ.get("ZOTERO_USER_ID", "").strip()
+    zotero_key = os.environ.get("ZOTERO_API_KEY", "").strip()
+
+    if not zotero_user or not zotero_key:
+        return "<div class='alert alert-warning'>Zotero API credentials not set. Add your user ID and API key in Step 3.</div>"
+
+    try:
+        from pyzotero import zotero as _zotero_mod
+        zot = _zotero_mod.Zotero(zotero_user, "user", zotero_key)
+        # Verify connectivity by fetching the item count
+        count = zot.num_items()
+        return (
+            f"<div class='alert alert-success'>"
+            f"<strong>✓ Zotero API connected.</strong> "
+            f"Library has {count} item(s). "
+            f"<a href='?step=4' style='color:var(--color-primary);'>Continue to Step 4 →</a>"
+            f"</div>"
+        )
+    except Exception as exc:
+        msg = str(exc)[:300]
+        return (
+            f"<div class='alert alert-danger'>"
+            f"<strong>✗ Zotero API connection failed.</strong><br>"
+            f"<code style='font-size:0.75rem;'>{msg}</code><br>"
+            f"<span style='font-size:0.75rem;'>"
+            f"Check your user ID and API key at "
+            f"<a href='https://www.zotero.org/settings/keys' target='_blank'>zotero.org/settings/keys</a>."
+            f"</span>"
+            f"</div>"
+        )
 
 
 @app.route("/writing-studio", methods=["GET", "POST"])
