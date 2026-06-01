@@ -12,6 +12,7 @@ Usage:
 """
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import time
@@ -34,6 +35,7 @@ from rich.table import Table
 from research_assistant.common import MODELS, THESIS_ROOT, ask_model
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -44,7 +46,17 @@ MAX_CHUNKS_PER_SOURCE = 3
 DEFAULT_K = 20
 DEFAULT_THRESHOLD = 0.35
 
-CHROMA_DIR = THESIS_ROOT / "chroma_db"
+def chroma_dir() -> Path:
+    """Return the ChromaDB vector-store directory, re-reading env vars each call.
+
+    Defaults to ``$THESIS_ROOT/chroma_db``. A settings change to
+    ``THESIS_ROOT`` takes effect on the next call without a restart.
+    """
+    thesis_root_raw = os.getenv("THESIS_ROOT", "").strip()
+    root = Path(thesis_root_raw) if thesis_root_raw else THESIS_ROOT
+    return root / "chroma_db"
+
+
 SESSION_DIR = THESIS_ROOT / "research_sessions"
 
 
@@ -147,6 +159,7 @@ def _find_pdf_attachment(zot, item_key: str) -> dict | None:
     try:
         children = zot.children(item_key)
     except Exception:
+        logger.exception("_find_pdf_attachment failed for item_key=%r", item_key)
         return None
     for child in children:
         data = child.get("data", {})
@@ -178,6 +191,7 @@ def _extract_pdf_text(pdf_path: Path) -> str | None:
             return None
         return "\n\n".join(pages)
     except Exception:
+        logger.exception("_extract_pdf_text failed for %s", pdf_path)
         return None
 
 
@@ -254,8 +268,9 @@ COLLECTION_NAME = "thesis_papers"
 def _get_chroma_client():
     if not _CHROMA_AVAILABLE:
         raise RuntimeError("chromadb not installed. Run: pip install chromadb")
-    CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-    return _chromadb.PersistentClient(path=str(CHROMA_DIR))
+    cd = chroma_dir()
+    cd.mkdir(parents=True, exist_ok=True)
+    return _chromadb.PersistentClient(path=str(cd))
 
 
 def _get_collection(client=None, name: str = COLLECTION_NAME):
@@ -1189,7 +1204,7 @@ def index_cmd(collection, limit, force, embedding_model, chunk_size, local, pdf_
 
     console.print(
         f"\n[dim]Embedding model: {embedding_model}[/dim]\n"
-        f"[dim]Storage: {CHROMA_DIR}[/dim]"
+        f"[dim]Storage: {chroma_dir()}[/dim]"
     )
 
 
@@ -1225,7 +1240,7 @@ def index_cmd(collection, limit, force, embedding_model, chunk_size, local, pdf_
 def ask_cmd(question, k_chunks, threshold, model, temperature, save, session, raw, compare, embedding_model):
     """Ask a research question against your indexed documents."""
     # Check index exists
-    if not CHROMA_DIR.exists():
+    if not chroma_dir().exists():
         console.print(
             "[red]No index found. Run 'researcher.py index' first.[/red]"
         )
@@ -1366,7 +1381,7 @@ def sessions_cmd(view):
 @main.command("stats")
 def stats_cmd():
     """Show index statistics."""
-    if not CHROMA_DIR.exists():
+    if not chroma_dir().exists():
         console.print("[yellow]No index found. Run 'researcher.py index' first.[/yellow]")
         return
 
@@ -1386,7 +1401,7 @@ def stats_cmd():
     table.add_row("Chunk size", str(index_meta.get("chunk_size", "?")))
     table.add_row("Chunk overlap", str(index_meta.get("chunk_overlap", "?")))
     table.add_row("Last indexed", index_meta.get("indexed_at", "unknown"))
-    table.add_row("Storage path", str(CHROMA_DIR))
+    table.add_row("Storage path", str(chroma_dir()))
 
     console.print(table)
 

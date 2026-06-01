@@ -721,23 +721,24 @@ def run_tool(name: str, form_data: Mapping[str, str]) -> ToolResult:
     collected = collect_form(spec, form_data)
     scratch: list[Path] = []
     try:
-        argv = _argv_for(spec, collected, scratch)
-    except ValueError as exc:
-        return ToolResult(output="", exit_code=2, argv=[], error=str(exc))
+        try:
+            argv = _argv_for(spec, collected, scratch)
+        except ValueError as exc:
+            return ToolResult(output="", exit_code=2, argv=[], error=str(exc))
 
-    try:
-        module = importlib.import_module(module_name)
-    except Exception as exc:
-        return ToolResult(output="", exit_code=1, argv=argv, error=f"Import failed: {exc}")
+        try:
+            module = importlib.import_module(module_name)
+        except Exception as exc:
+            return ToolResult(output="", exit_code=1, argv=argv, error=f"Import failed: {exc}")
 
-    cmd = getattr(module, "main", None)
-    if cmd is None:
-        return ToolResult(output="", exit_code=1, argv=argv, error=f"Module '{module_name}' has no `main` Click command.")
+        cmd = getattr(module, "main", None)
+        if cmd is None:
+            return ToolResult(output="", exit_code=1, argv=argv,
+                              error=f"Module '{module_name}' has no `main` Click command.")
 
-    runner = CliRunner(mix_stderr=False)
-    # Force monochrome / no-TTY output for rich-based modules.
-    env = {"FORCE_COLOR": "0", "NO_COLOR": "1", "TERM": "dumb"}
-    try:
+        runner = CliRunner(mix_stderr=False)
+        # Force monochrome / no-TTY output for rich-based modules.
+        env = {"FORCE_COLOR": "0", "NO_COLOR": "1", "TERM": "dumb"}
         result = runner.invoke(cmd, argv, catch_exceptions=True, env=env)
     finally:
         for path in scratch:

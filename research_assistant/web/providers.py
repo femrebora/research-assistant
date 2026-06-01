@@ -163,13 +163,11 @@ def test_provider(alias: str, prompt: str = "Reply with the single word: OK.") -
 
     start = time.monotonic()
     try:
-        # For GPT-5 family models, temperature=0 is not supported.
-        # Use temperature=1 as a safe default for testing.
-        model_full = MODELS.get(alias, "")
-        if "gpt-5" in str(model_full).lower() or (alias in ("gpt", "gpt-mini", "codex") and "gpt-5" in str(model_full)):
-            test_temp = 1.0
-        else:
-            test_temp = 0.0
+        # Some model families (GPT-5.x) reject temperature=0.
+        # Check the resolved model string rather than the alias for accuracy.
+        model_full = str(MODELS.get(alias, "")).lower()
+        _NO_ZERO_TEMP = ("gpt-5", "o4-mini", "o3-mini")
+        test_temp = 1.0 if any(m in model_full for m in _NO_ZERO_TEMP) else 0.0
 
         result = ask_model(prompt, model=alias, max_tokens=16, temperature=test_temp)
     except Exception as e:  # surface any provider error to the UI

@@ -1,6 +1,6 @@
 {% from "macros/ui.html" import help_tooltip, form_field, advanced_settings, status_card, empty_state, error_state, loading_state, page_header, card, alert, tabs, wizard_steps, result_panel with context %}
 {% macro nav_item(href, label, icon, active_route, desc='') -%}
-    {% set is_active = href == active_route or (href != '/' and active_route.startswith(href)) %}
+    {% set is_active = href == active_route or (href != '/' and (active_route.startswith(href + '/') or active_route.startswith(href + '?'))) %}
     <a href="{{ href }}"
        class="sidebar-nav-item{% if is_active %} active{% endif %}"
        {% if is_active %}aria-current="page"{% endif %}>

@@ -21,10 +21,10 @@ from rich.table import Table
 
 from research_assistant.common import read_file
 from research_assistant.researcher import (
-    CHROMA_DIR,
     DEFAULT_EMBED_MODEL,
     _embed_single,
     _get_collection,
+    chroma_dir,
 )
 from research_assistant.verification import external_match as _em
 from research_assistant.verification.paraphrase_check import split_paragraphs
@@ -100,7 +100,7 @@ def _internal_matches(
     paragraph: str, threshold: float, *, para_emb: list[float] | None = None,
 ) -> list[ExternalMatch]:
     """Cosine-similarity matches against the local Chroma index (your indexed library)."""
-    if not CHROMA_DIR.exists():
+    if not chroma_dir().exists():
         return []
     try:
         collection = _get_collection()

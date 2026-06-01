@@ -2,39 +2,39 @@
 {% block content %}
 <div class="flex items-center justify-between mb-6">
     <div>
-        <h2 class="text-2xl font-semibold text-slate-900">Settings</h2>
-        <p class="text-sm text-slate-500 mt-1">Editing <span class="font-mono text-slate-600">{{ env_file }}</span></p>
+        <h2 class="text-2xl font-semibold" style="color:var(--color-text);">Settings</h2>
+        <p class="text-sm" style="color:var(--color-text-secondary);">Editing <span class="font-mono" style="color:var(--color-text-muted);">{{ env_file }}</span></p>
     </div>
-    <a href="/providers" class="px-3 py-1.5 text-sm font-medium rounded border border-slate-300 text-slate-600 hover:bg-slate-50">
+    <a href="/providers" class="btn btn-ghost text-sm">
         ← Provider health
     </a>
 </div>
 
 {% if flash_ok %}
-<div class="mb-5 rounded border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">{{ flash_ok }}</div>
+<div class="alert alert-success mb-5">{{ flash_ok }}</div>
 {% endif %}
 {% if flash_error %}
-<div class="mb-5 rounded border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{{ flash_error }}</div>
+<div class="alert alert-danger mb-5">{{ flash_error }}</div>
 {% endif %}
 
 <!-- Secrets: read-only status -->
-<div class="bg-white rounded-lg border border-slate-200 p-5 mb-6">
+<div class="card card-padded mb-6">
     <div class="flex items-center justify-between mb-1">
-        <h3 class="font-medium text-slate-900">API keys &amp; secrets</h3>
-        <span class="text-[11px] text-slate-400">read-only — edit in {{ env_file }}</span>
+        <h3 class="font-medium" style="color:var(--color-text);">API keys &amp; secrets</h3>
+        <span class="text-xs" style="color:var(--color-text-muted);">read-only — edit in {{ env_file }}</span>
     </div>
-    <p class="text-xs text-slate-500 mb-4">For your safety, secrets are never shown or edited in the browser — only whether they are set.</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+    <p class="text-xs" style="color:var(--color-text-secondary); margin-bottom:1rem;">For your safety, secrets are never shown or edited in the browser — only whether they are set.</p>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 2rem;">
         {% for s in secrets %}
-        <div class="flex items-center justify-between py-1.5 border-b border-slate-100">
-            <span class="text-sm font-mono text-slate-600">{{ s.key }}</span>
+        <div class="flex items-center justify-between py-1.5" style="border-bottom:1px solid var(--color-border);">
+            <span class="text-sm font-mono" style="color:var(--color-text-secondary);">{{ s.key }}</span>
             {% if s.configured %}
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> set ••••
+            <span class="status-pill status-pill-ok">
+                <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-success);"></span> set ••••
             </span>
             {% else %}
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500">
-                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> not set
+            <span class="status-pill" style="background:var(--color-surface-soft);color:var(--color-text-secondary);">
+                <span class="w-1.5 h-1.5 rounded-full" style="background:var(--color-text-muted);"></span> not set
             </span>
             {% endif %}
         </div>
@@ -43,28 +43,28 @@
 </div>
 
 <!-- Editable config -->
-<form method="POST" class="space-y-6">
+<form method="POST" style="display:flex;flex-direction:column;gap:1.5rem;">
     {% set groups = fields | groupby("group") %}
     {% for group, items in groups %}
-    <div class="bg-white rounded-lg border border-slate-200 p-5">
-        <h3 class="font-medium text-slate-900 mb-4">{{ group }}</h3>
-        <div class="space-y-4">
+    <div class="card card-padded">
+        <h3 class="font-medium" style="color:var(--color-text);margin-bottom:1rem;">{{ group }}</h3>
+        <div style="display:flex;flex-direction:column;gap:1rem;">
             {% for f in items %}
             <div>
-                <label for="f-{{ f.key }}" class="block text-sm font-medium text-slate-700">{{ f.label }}
-                    <span class="font-mono text-xs text-slate-400">{{ f.key }}</span>
+                <label for="f-{{ f.key }}" class="form-label">{{ f.label }}
+                    <span class="font-mono text-xs" style="color:var(--color-text-muted);">{{ f.key }}</span>
                     {% if f.configured %}
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 ml-2">
+                    <span class="status-pill status-pill-ok ml-2">
                         ✓ configured
                     </span>
                     {% endif %}
                 </label>
-                {% if f.help %}<p class="text-xs text-slate-500 mt-0.5">{{ f.help }}</p>{% endif %}
+                {% if f.help %}<p class="form-helper">{{ f.help }}</p>{% endif %}
                 <input id="f-{{ f.key }}" name="{{ f.key }}"
                        type="{{ 'number' if f.kind == 'number' else 'password' if f.kind == 'password' else 'text' }}"
                        {% if f.kind == 'password' %}autocomplete="new-password" value=""{% else %}value="{{ f.value }}"{% endif %}
                        placeholder="{{ f.placeholder }}"
-                       class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                       class="form-input mt-1 font-mono text-sm">
             </div>
             {% endfor %}
         </div>
@@ -72,10 +72,10 @@
     {% endfor %}
 
     <div class="flex items-center gap-3">
-        <button type="submit" class="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition">
+        <button type="submit" class="btn btn-primary">
             Save changes
         </button>
-        <span class="text-xs text-slate-500">Path &amp; timeout changes that are read at startup take effect after a restart.</span>
+        <span class="text-xs" style="color:var(--color-text-secondary);">Path &amp; timeout changes that are read at startup take effect after a restart.</span>
     </div>
 </form>
 {% endblock %}

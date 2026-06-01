@@ -13,6 +13,7 @@ on demand so an AI edit prompt can include them as context.
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,23 +21,33 @@ from pathlib import Path
 from research_assistant.common import THESIS_ROOT
 from research_assistant.researcher import _extract_pdf_text
 
-# Default folder for raw PDFs. Override via the env var; falls back to
-# ``$THESIS_ROOT`` so a fresh install works without configuration.
-DOCS_DIR: Path = Path(
-    os.getenv("THESIS_DOCS")
-    or os.getenv("THESIS_PDF_DIR")
-    or str(THESIS_ROOT)
-).expanduser()
+logger = logging.getLogger(__name__)
 
-# Resolve Zotero storage path
-def _resolve_zotero_storage() -> Path | None:
-    _zs = os.getenv("ZOTERO_STORAGE", "").strip()
-    if not _zs:
+
+def docs_dir() -> Path:
+    """Return the active local-PDF folder, re-reading env vars each call.
+
+    Override via ``THESIS_DOCS``; falls back to ``THESIS_PDF_DIR``; otherwise
+    defaults to ``$THESIS_ROOT`` so a fresh install works without configuration.
+    """
+    return Path(
+        os.getenv("THESIS_DOCS")
+        or os.getenv("THESIS_PDF_DIR")
+        or str(THESIS_ROOT)
+    ).expanduser()
+
+
+def zotero_storage() -> Path | None:
+    """Return the resolved Zotero storage path, re-reading env vars each call.
+
+    Returns ``None`` when ``ZOTERO_STORAGE`` is unset or the path does not exist.
+    """
+    raw = os.getenv("ZOTERO_STORAGE", "").strip()
+    if not raw:
         return None
-    expanded = Path(_zs).expanduser()
+    expanded = Path(raw).expanduser()
     return expanded if expanded.exists() else None
 
-ZOTERO_STORAGE: Path | None = _resolve_zotero_storage()
 
 # Per-document excerpt cap when feeding text into an AI edit prompt. Keeps
 # total token usage predictable even when the user attaches many sources.
@@ -75,13 +86,14 @@ class LibraryResult:
 
 def configured_root() -> Path:
     """Return the active local-PDF folder so the UI can show it to the user."""
-    return DOCS_DIR
+    return docs_dir()
 
 
 def zotero_storage_path() -> str:
     """Return the resolved Zotero storage path as a string for the UI."""
-    if ZOTERO_STORAGE:
-        return str(ZOTERO_STORAGE)
+    zs = zotero_storage()
+    if zs:
+        return str(zs)
     raw = os.getenv("ZOTERO_STORAGE", "").strip()
     if raw:
         expanded = str(Path(raw).expanduser())
@@ -158,15 +170,17 @@ def search(query: str, field: str = "all") -> list[dict]:
                     "pdf_path": "",
                 })
         except Exception:
-            pass  # Zotero API not available — fall through to local search
+            logger.exception("Zotero API search failed (user=%r)", zotero_user)
+            # fall through to local search
 
     # ── Local PDF search in ZOTERO_STORAGE ──────────────────────────────
-    if ZOTERO_STORAGE and ZOTERO_STORAGE.exists() and query:
+    zs = zotero_storage()
+    if zs and zs.exists() and query:
         query_lower = query.lower()
         try:
-            for pdf_path in ZOTERO_STORAGE.rglob("*.pdf"):
+            for pdf_path in zs.rglob("*.pdf"):
                 if query_lower in pdf_path.name.lower():
-                    rel = pdf_path.relative_to(ZOTERO_STORAGE).as_posix()
+                    rel = pdf_path.relative_to(zs).as_posix()
                     # Avoid duplicates with API results
                     if not any(r.get("pdf_path") == rel for r in results):
                         results.append({
@@ -182,12 +196,13 @@ def search(query: str, field: str = "all") -> list[dict]:
             pass
 
     # ── Local PDF search in DOCS_DIR ────────────────────────────────────
-    if DOCS_DIR.exists() and query:
+    docs = docs_dir()
+    if docs.exists() and query:
         query_lower = query.lower()
         try:
-            for pdf_path in DOCS_DIR.rglob("*.pdf"):
+            for pdf_path in docs.rglob("*.pdf"):
                 if query_lower in pdf_path.name.lower():
-                    rel = pdf_path.relative_to(DOCS_DIR).as_posix()
+                    rel = pdf_path.relative_to(docs).as_posix()
                     if not any(r.get("pdf_path") == rel for r in results):
                         results.append({
                             "title": pdf_path.stem,
@@ -205,7 +220,7 @@ def search(query: str, field: str = "all") -> list[dict]:
 
 
 def list_pdfs(root: Path | None = None, *, limit: int = 200) -> list[LocalPdf]:
-    """List PDFs under ``root`` (defaults to :data:`DOCS_DIR`).
+    """List PDFs under ``root`` (defaults to :func:`docs_dir`).
 
     Also includes PDFs from ZOTERO_STORAGE if configured.
     The result is sorted by modified-time, newest first, and capped at
@@ -214,7 +229,7 @@ def list_pdfs(root: Path | None = None, *, limit: int = 200) -> list[LocalPdf]:
     items: list[LocalPdf] = []
 
     # ── DOCS_DIR ───────────────────────────────────────────────────────
-    base = (root or DOCS_DIR).expanduser()
+    base = (root or docs_dir()).expanduser()
     if base.exists() and base.is_dir():
         for path in base.rglob("*.pdf"):
             try:
@@ -235,15 +250,16 @@ def list_pdfs(root: Path | None = None, *, limit: int = 200) -> list[LocalPdf]:
             )
 
     # ── ZOTERO_STORAGE ─────────────────────────────────────────────────
-    if ZOTERO_STORAGE and ZOTERO_STORAGE.exists() and base != ZOTERO_STORAGE:
-        for path in ZOTERO_STORAGE.rglob("*.pdf"):
+    zs = zotero_storage()
+    if zs and zs.exists() and base != zs:
+        for path in zs.rglob("*.pdf"):
             try:
                 stat = path.stat()
             except OSError:
                 continue
             if not path.is_file():
                 continue
-            rel = path.relative_to(ZOTERO_STORAGE).as_posix()
+            rel = path.relative_to(zs).as_posix()
             items.append(
                 LocalPdf(
                     rel_path=rel,
@@ -285,11 +301,11 @@ def resolve(rel_path: str) -> Path | None:
 
 
 def _resolve(rel_path: str) -> Path | None:
-    """Resolve ``rel_path`` against :data:`DOCS_DIR`, rejecting escapes."""
+    """Resolve ``rel_path`` against :func:`docs_dir`, rejecting escapes."""
     if not rel_path:
         return None
-    candidate = (DOCS_DIR / rel_path).expanduser().resolve()
-    root = DOCS_DIR.expanduser().resolve()
+    root = docs_dir().expanduser().resolve()
+    candidate = (root / rel_path).expanduser().resolve()
     try:
         candidate.relative_to(root)
     except ValueError:
