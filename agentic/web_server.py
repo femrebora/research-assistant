@@ -127,7 +127,8 @@ def paperforge_progress(job_id: str):
         done = False
         while not done:
             events, new_idx = get_events(job_id, last_idx)
-            for evt in events[last_idx:]:
+            # get_events already returns events newer than last_idx — do not re-slice
+            for evt in events:
                 yield f"data: {json.dumps(evt, ensure_ascii=False)}\n\n"
             last_idx = new_idx
 

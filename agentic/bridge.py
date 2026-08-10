@@ -15,15 +15,27 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-THESIS_ROOT = Path(os.getenv("THESIS_ROOT", str(Path.home() / "thesis")))
-CACHE_DIR = THESIS_ROOT / "cache"
-CACHE_DIR.mkdir(parents=True, exist_ok=True)
+def _thesis_root() -> Path:
+    return Path(os.getenv("THESIS_ROOT", str(Path.home() / "thesis")))
+
+
+def _cache_dir() -> Path:
+    """Return (and lazily create) the cache directory under THESIS_ROOT."""
+    path = _thesis_root() / "cache"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+# Backward-compatible module attribute used by older callers/tests.
+# Prefer _cache_dir() so THESIS_ROOT changes and missing parents do not crash import.
+CACHE_DIR = _thesis_root() / "cache"
 
 TIMEOUT = 600  # seconds per agent call
 
 # DeepSeek API config
 DEEPSEEK_BASE = "https://api.deepseek.com"
 DEEPSEEK_MODEL = "deepseek-chat"  # v3-equivalent, fast and cheap
+# Kept for tests/callers that patch this name; runtime reads os.environ directly.
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
 # Gemini API config (optional fallback — use CLI for now)
@@ -56,7 +68,7 @@ def call_agent(
     Claude → claude CLI, DeepSeek → direct API, Gemini → gemini CLI.
     Falls back when primary response is broken/empty/timed-out.
     """
-    primary = _dispatch(prompt, model, system)
+    primary = _dispatch(prompt, model, system, temperature=temperature)
     if not _is_broken(primary.get("text", "")):
         return primary
 
@@ -66,7 +78,7 @@ def call_agent(
             continue
         print(f"  ⚠ {model} response broken ({len(primary.get('text',''))} chars), "
               f"falling back to {fb_model}...", file=sys.stderr)
-        fb_result = _dispatch(prompt, fb_model, system)
+        fb_result = _dispatch(prompt, fb_model, system, temperature=temperature)
         if not _is_broken(fb_result.get("text", "")):
             fb_result["fallback_from"] = model
             return fb_result
@@ -74,13 +86,18 @@ def call_agent(
     return primary
 
 
-def _dispatch(prompt: str, model: str, system: str | None = None) -> dict:
+def _dispatch(
+    prompt: str,
+    model: str,
+    system: str | None = None,
+    temperature: float = 0.3,
+) -> dict:
     """Route to the right backend."""
     if model in ("claude", "sonnet", "haiku"):
         full = f"System instructions: {system}\n\n---\n\nUser query: {prompt}" if system else prompt
         return _call_claude(full, model)
     elif model == "deepseek":
-        return _call_deepseek(prompt, system)
+        return _call_deepseek(prompt, system, temperature=temperature)
     elif model in ("gemini", "flash"):
         full = f"System instructions: {system}\n\n---\n\nUser query: {prompt}" if system else prompt
         return _call_gemini(full)
@@ -131,11 +148,15 @@ def _call_claude(prompt: str, model: str) -> dict:
             "cost": parsed["cost"]}
 
 
-def _call_deepseek(prompt: str, system: str | None = None) -> dict:
+def _call_deepseek(
+    prompt: str,
+    system: str | None = None,
+    temperature: float = 0.3,
+) -> dict:
     """Call DeepSeek via direct OpenAI-compatible API (bypasses CLI coding context)."""
-    api_key = DEEPSEEK_API_KEY or os.getenv("ANTHROPIC_AUTH_TOKEN", "")
+    api_key = (DEEPSEEK_API_KEY or os.getenv("DEEPSEEK_API_KEY", "")).strip()
     if not api_key:
-        return {"text": "(error: no DeepSeek API key — set ANTHROPIC_AUTH_TOKEN)",
+        return {"text": "(error: no DeepSeek API key — set DEEPSEEK_API_KEY)",
                 "model": "deepseek", "input_tokens": None, "output_tokens": None, "cost": None}
 
     messages = []
@@ -146,7 +167,7 @@ def _call_deepseek(prompt: str, system: str | None = None) -> dict:
     body = json.dumps({
         "model": DEEPSEEK_MODEL,
         "messages": messages,
-        "temperature": 0.3,
+        "temperature": temperature,
         "max_tokens": 8000,
     }).encode("utf-8")
 
@@ -208,7 +229,7 @@ def load_cache(path: str) -> str | None:
     """Load cached content from a file. Returns None if missing."""
     p = Path(path).expanduser()
     if not p.is_absolute():
-        p = CACHE_DIR / p
+        p = _cache_dir() / p
     if not p.exists():
         return None
     return p.read_text(encoding="utf-8")
@@ -218,7 +239,7 @@ def save_cache(path: str, content: str) -> Path:
     """Save content to a cache file. Returns the path."""
     p = Path(path).expanduser()
     if not p.is_absolute():
-        p = CACHE_DIR / p
+        p = _cache_dir() / p
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     return p
@@ -228,7 +249,7 @@ def cache_age_days(path: str) -> float | None:
     """Return age of cache file in days, or None if missing."""
     p = Path(path).expanduser()
     if not p.is_absolute():
-        p = CACHE_DIR / p
+        p = _cache_dir() / p
     if not p.exists():
         return None
     return (time.time() - p.stat().st_mtime) / 86400

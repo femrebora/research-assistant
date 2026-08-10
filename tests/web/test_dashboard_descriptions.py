@@ -60,10 +60,10 @@ def test_dashboard_shows_status_cards(client):
 
 
 @pytest.mark.unit
-def test_dashboard_has_recommended_workflow(client):
-    """The dashboard includes the recommended workflow section."""
+def test_dashboard_has_continue_writing(client):
+    """The dashboard includes a clear next-step writing section."""
     body = client.get("/").get_data(as_text=True)
-    assert "Recommended workflow" in body
+    assert "Continue writing" in body or "Ask your library" in body
 
 
 @pytest.mark.unit

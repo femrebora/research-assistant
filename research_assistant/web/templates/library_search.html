@@ -47,7 +47,7 @@
             {% for r in results %}
             <tr>
                 <td style="font-weight:500;color:var(--color-text-primary);">{{ r.title }}</td>
-                <td>{{ r.author or '—' }}</td>
+                <td>{{ r.authors or r.author or '—' }}</td>
                 <td>{{ r.year or '—' }}</td>
                 <td><code>{{ r.citekey or '—' }}</code></td>
             </tr>
@@ -71,7 +71,8 @@
     <div style="max-height:16rem;overflow-y:auto;font-size:0.8125rem;">
         {% for pdf in pdfs[:50] %}
         <div style="padding:0.25rem 0;border-bottom:1px solid var(--color-border);color:var(--color-text-secondary);">
-            📄 {{ pdf }}
+            <span class="mono">{{ pdf.name }}</span>
+            <span style="color:var(--color-text-muted);margin-left:0.5rem;">{{ pdf.rel_path }} · {{ pdf.size_kb }} KB</span>
         </div>
         {% endfor %}
         {% if pdfs|length > 50 %}

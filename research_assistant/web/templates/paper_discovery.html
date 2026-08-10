@@ -34,13 +34,13 @@
 {# ── Tabs for discovery sources ─────────────────────────────────────────── #}
 <div class="tab-bar" role="tablist" id="discovery-bar">
     <button type="button" class="tab-btn active" data-tab="openalex" onclick="switchTab('discovery','openalex')" role="tab" aria-selected="true">
-        🔬 OpenAlex
+        OpenAlex
     </button>
     <button type="button" class="tab-btn" data-tab="semantic" onclick="switchTab('discovery','semantic')" role="tab" aria-selected="false">
-        📖 Semantic Scholar
+        Semantic Scholar
     </button>
     <button type="button" class="tab-btn" data-tab="elicit" onclick="switchTab('discovery','elicit')" role="tab" aria-selected="false">
-        🧠 Elicit
+        Elicit
     </button>
 </div>
 
@@ -64,9 +64,6 @@
                            class="form-input" style="max-width:6rem;">
                 </div>
                 <button type="submit" class="btn btn-primary">Search OpenAlex</button>
-                <span id="discover-indicator" class="htmx-indicator" style="display:inline-flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--color-text-muted);">
-                    <span class="spinner"></span> Searching…
-                </span>
             </div>
         </form>
     </div>
@@ -122,6 +119,9 @@
     </div>
 </div>
 
+<div id="discover-indicator" class="htmx-indicator" style="display:inline-flex;align-items:center;gap:0.375rem;font-size:0.8125rem;color:var(--color-text-muted);margin-bottom:0.75rem;">
+    <span class="spinner"></span> Searching…
+</div>
 <div id="discover-result"></div>
 
 {% endblock %}

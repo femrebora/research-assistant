@@ -39,12 +39,26 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-DEFAULT_EMBED_MODEL = "openai/text-embedding-3-small"
+DEFAULT_EMBED_MODEL = os.getenv("EMBEDDING_MODEL", "openai/text-embedding-3-small")
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 200
 MAX_CHUNKS_PER_SOURCE = 3
 DEFAULT_K = 20
 DEFAULT_THRESHOLD = 0.35
+
+
+def _active_embed_model(explicit: str | None = None) -> str:
+    """Resolve the embedding model, preferring an explicit value then live env."""
+    if explicit:
+        return explicit
+    return os.getenv("EMBEDDING_MODEL", DEFAULT_EMBED_MODEL) or DEFAULT_EMBED_MODEL
+
+
+def _thesis_root() -> Path:
+    """Return the active thesis root, re-reading env vars each call."""
+    thesis_root_raw = os.getenv("THESIS_ROOT", "").strip()
+    return Path(thesis_root_raw).expanduser() if thesis_root_raw else THESIS_ROOT
+
 
 def chroma_dir() -> Path:
     """Return the ChromaDB vector-store directory, re-reading env vars each call.
@@ -52,31 +66,34 @@ def chroma_dir() -> Path:
     Defaults to ``$THESIS_ROOT/chroma_db``. A settings change to
     ``THESIS_ROOT`` takes effect on the next call without a restart.
     """
-    thesis_root_raw = os.getenv("THESIS_ROOT", "").strip()
-    root = Path(thesis_root_raw) if thesis_root_raw else THESIS_ROOT
-    return root / "chroma_db"
+    return _thesis_root() / "chroma_db"
 
 
-SESSION_DIR = THESIS_ROOT / "research_sessions"
+def session_dir() -> Path:
+    """Return the research sessions directory, re-reading env vars each call."""
+    return _thesis_root() / "research_sessions"
+
+
+# Backward-compatible alias — prefer session_dir() so THESIS_ROOT changes apply.
+SESSION_DIR = session_dir()
 
 
 def _ensure_session_dir() -> None:
-    """Create SESSION_DIR on first use (not at import time).
+    """Create the sessions directory on first use (not at import time).
 
     Deferring this avoids crashing the entire app at import time when
     THESIS_ROOT points to an inaccessible path (e.g. a stale hardcoded
     path in .env).
     """
+    path = session_dir()
     try:
-        SESSION_DIR.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
     except (PermissionError, OSError) as e:
-        import sys
-
         print(
-            f"Error: Cannot create session directory at {SESSION_DIR}\n"
+            f"Error: Cannot create session directory at {path}\n"
             f"  Check that THESIS_ROOT in your .env file points to a writable location.\n"
             f"  Current value: {os.getenv('THESIS_ROOT', '(default)')}\n"
-            f"  Expanded path: {THESIS_ROOT}\n"
+            f"  Expanded path: {_thesis_root()}\n"
             f"  Detail: {e}",
             file=sys.stderr,
         )
@@ -229,11 +246,12 @@ def chunk_text(
 
 def _embed_texts(
     texts: list[str],
-    model: str = DEFAULT_EMBED_MODEL,
+    model: str | None = None,
     max_retries: int = 3,
 ) -> list[list[float]]:
     import litellm as _litellm
 
+    model = _active_embed_model(model)
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
@@ -249,7 +267,7 @@ def _embed_texts(
     )
 
 
-def _embed_single(text: str, model: str = DEFAULT_EMBED_MODEL) -> list[float]:
+def _embed_single(text: str, model: str | None = None) -> list[float]:
     return _embed_texts([text], model=model)[0]
 
 
@@ -327,15 +345,34 @@ def _remove_document(collection, zotero_key: str) -> None:
         )
 
 
+def _count_unique_documents(collection) -> int:
+    """Count unique documents in the collection by ``zotero_key`` metadata."""
+    try:
+        result = collection.get(include=["metadatas"])
+        keys = {
+            meta.get("zotero_key")
+            for meta in (result.get("metadatas") or [])
+            if meta and meta.get("zotero_key")
+        }
+        return len(keys)
+    except Exception:
+        return 0
+
+
 def _get_index_stats(collection) -> dict:
     index_meta = _get_index_meta(collection) or {}
 
     try:
         chunk_count = collection.count()
+        # Exclude the synthetic metadata document from chunk counts when present
+        if _get_index_meta(collection) is not None and chunk_count > 0:
+            chunk_count = max(0, chunk_count - 1)
     except Exception:
         chunk_count = 0
 
     docs_count = index_meta.get("total_documents", 0)
+    if not docs_count:
+        docs_count = _count_unique_documents(collection)
 
     return {
         "documents": docs_count,
@@ -440,10 +477,17 @@ def index_zotero_papers(
     collection_name: str | None = None,
     limit: int | None = None,
     force: bool = False,
-    embedding_model: str = DEFAULT_EMBED_MODEL,
+    embedding_model: str | None = None,
     chunk_size: int = CHUNK_SIZE,
+    on_progress=None,
 ) -> dict:
-    """Index Zotero PDFs into ChromaDB. Returns summary dict."""
+    """Index Zotero PDFs into ChromaDB. Returns summary dict.
+
+    ``on_progress(current, total, status)`` is called after each item when set.
+    """
+    if embedding_model is None:
+        embedding_model = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBED_MODEL)
+
     if not _ZOTERO_AVAILABLE:
         console.print("[red]pyzotero not installed. Run: pip install pyzotero[/red]")
         sys.exit(1)
@@ -492,13 +536,16 @@ def index_zotero_papers(
     ) as progress:
         task = progress.add_task("[cyan]Indexing papers...", total=len(items_list))
 
-        for item in items_list:
+        for i, item in enumerate(items_list, start=1):
             item_title = item.get("data", {}).get("title", "Unknown")[:60]
             progress.update(task, description=f"[cyan]{item_title}...")
 
             _process_item(zot, item, collection, force, embedding_model, chunk_size, stats)
             progress.advance(task)
+            if on_progress:
+                on_progress(i, len(items_list), item_title)
 
+    total_docs = _count_unique_documents(collection)
     # Store index metadata
     _store_index_meta(
         collection,
@@ -506,10 +553,11 @@ def index_zotero_papers(
             "embedding_model": embedding_model,
             "chunk_size": chunk_size,
             "chunk_overlap": CHUNK_OVERLAP,
-            "total_documents": stats["indexed"],
+            "total_documents": total_docs,
             "total_chunks": stats["total_chunks"],
         },
     )
+    stats["documents"] = total_docs
 
     return stats
 
@@ -524,8 +572,10 @@ def _find_collection_key(zot, name: str) -> tuple[str | None, str | None]:
 def index_local_pdfs(
     pdf_dir: str | None = None,
     force: bool = False,
-    embedding_model: str = DEFAULT_EMBED_MODEL,
+    embedding_model: str | None = None,
     chunk_size: int = CHUNK_SIZE,
+    limit: int | None = None,
+    on_progress=None,
 ) -> dict:
     """Index PDFs directly from a directory — no Zotero API required.
 
@@ -536,6 +586,9 @@ def index_local_pdfs(
     Metadata is derived from the filename and directory path since no
     Zotero metadata is available.
     """
+    if embedding_model is None:
+        embedding_model = os.getenv("EMBEDDING_MODEL", DEFAULT_EMBED_MODEL)
+
     resolved_dir: Path | None = None
     for candidate in (pdf_dir, os.getenv("ZOTERO_STORAGE"), os.getenv("THESIS_DOCS")):
         if candidate:
@@ -552,11 +605,13 @@ def index_local_pdfs(
         sys.exit(1)
 
     pdf_files = sorted(resolved_dir.rglob("*.pdf"))
+    if limit is not None and limit > 0:
+        pdf_files = pdf_files[:limit]
     if not pdf_files:
         console.print(f"[yellow]No .pdf files found under {resolved_dir}[/yellow]")
         return {
             "total_items": 0, "with_pdfs": 0, "indexed": 0,
-            "skipped": 0, "failed": 0, "total_chunks": 0,
+            "skipped": 0, "failed": 0, "total_chunks": 0, "documents": 0,
         }
 
     import hashlib
@@ -584,7 +639,7 @@ def index_local_pdfs(
     ) as progress:
         task = progress.add_task("[cyan]Indexing local PDFs...", total=len(pdf_files))
 
-        for pdf_path in pdf_files:
+        for i, pdf_path in enumerate(pdf_files, start=1):
             rel = str(pdf_path.relative_to(resolved_dir))
             progress.update(task, description=f"[cyan]{rel[:60]}...")
 
@@ -595,18 +650,24 @@ def index_local_pdfs(
             if not force and _is_document_indexed(collection, doc_key):
                 stats["skipped"] += 1
                 progress.advance(task)
+                if on_progress:
+                    on_progress(i, len(pdf_files), rel[:60])
                 continue
 
             text = _extract_pdf_text(pdf_path)
             if not text:
                 stats["failed"] += 1
                 progress.advance(task)
+                if on_progress:
+                    on_progress(i, len(pdf_files), rel[:60])
                 continue
 
             chunks = chunk_text(text, size=chunk_size)
             if not chunks:
                 stats["failed"] += 1
                 progress.advance(task)
+                if on_progress:
+                    on_progress(i, len(pdf_files), rel[:60])
                 continue
 
             # Remove existing chunks if forcing re-index
@@ -618,6 +679,8 @@ def index_local_pdfs(
             except Exception:
                 stats["failed"] += 1
                 progress.advance(task)
+                if on_progress:
+                    on_progress(i, len(pdf_files), rel[:60])
                 continue
 
             stem = pdf_path.stem[:80]
@@ -652,17 +715,21 @@ def index_local_pdfs(
                 stats["failed"] += 1
 
             progress.advance(task)
+            if on_progress:
+                on_progress(i, len(pdf_files), rel[:60])
 
+    total_docs = _count_unique_documents(collection)
     _store_index_meta(
         collection,
         {
             "embedding_model": embedding_model,
             "chunk_size": chunk_size,
             "chunk_overlap": CHUNK_OVERLAP,
-            "total_documents": stats["indexed"],
+            "total_documents": total_docs,
             "total_chunks": stats["total_chunks"],
         },
     )
+    stats["documents"] = total_docs
 
     return stats
 
@@ -675,12 +742,13 @@ def retrieve_chunks(
     collection=None,
     k: int = DEFAULT_K,
     threshold: float = DEFAULT_THRESHOLD,
-    embedding_model: str = DEFAULT_EMBED_MODEL,
+    embedding_model: str | None = None,
 ) -> list[dict]:
     """Retrieve relevant chunks for a question. Returns list of result dicts."""
     if collection is None:
         collection = _get_collection()
 
+    embedding_model = _active_embed_model(embedding_model)
     q_embedding = _embed_single(question, model=embedding_model)
 
     try:
@@ -788,13 +856,14 @@ def ask_research_question(
     temperature: float = 0.3,
     k: int = DEFAULT_K,
     threshold: float = DEFAULT_THRESHOLD,
-    embedding_model: str = DEFAULT_EMBED_MODEL,
+    embedding_model: str | None = None,
     collection=None,
 ) -> dict:
     """Full RAG pipeline: retrieve → build context → ask model. Returns result dict."""
     if collection is None:
         collection = _get_collection()
 
+    embedding_model = _active_embed_model(embedding_model)
     console.print(f"[dim]→ Retrieving up to {k} chunks (threshold: {threshold})...[/dim]")
 
     results = retrieve_chunks(
@@ -869,13 +938,14 @@ def compare_research_question(
     temperature: float = 0.3,
     k: int = DEFAULT_K,
     threshold: float = DEFAULT_THRESHOLD,
-    embedding_model: str = DEFAULT_EMBED_MODEL,
+    embedding_model: str | None = None,
     collection=None,
 ) -> dict[str, dict]:
     """Run the same RAG query against multiple models in parallel. Returns {model_name: result_dict}."""
     if collection is None:
         collection = _get_collection()
 
+    embedding_model = _active_embed_model(embedding_model)
     console.print(f"[dim]→ Retrieving up to {k} chunks (threshold: {threshold})...[/dim]")
 
     results = retrieve_chunks(
@@ -979,8 +1049,9 @@ def save_session(
     """Save a Q&A to a session file. Returns the file path."""
     _ensure_session_dir()
     safe_name = _safe_session_name(name)
-    path = (SESSION_DIR / safe_name).resolve()
-    if not str(path).startswith(str(SESSION_DIR.resolve())):
+    base = session_dir()
+    path = (base / safe_name).resolve()
+    if not str(path).startswith(str(base.resolve())):
         raise ValueError(f"Invalid session name: {name}")
     path = path.with_suffix(".md")
 
@@ -1044,8 +1115,9 @@ def _save_comparison_session(
     """Save a multi-model comparison to a session file."""
     _ensure_session_dir()
     safe_name = _safe_session_name(name)
-    path = (SESSION_DIR / safe_name).resolve()
-    if not str(path).startswith(str(SESSION_DIR.resolve())):
+    base = session_dir()
+    path = (base / safe_name).resolve()
+    if not str(path).startswith(str(base.resolve())):
         raise ValueError(f"Invalid session name: {name}")
     path = path.with_suffix(".md")
 
@@ -1105,7 +1177,7 @@ def _save_comparison_session(
 def list_sessions() -> list[dict]:
     """List all saved research sessions."""
     sessions = []
-    for f in sorted(SESSION_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for f in sorted(session_dir().glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             text = f.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -1295,7 +1367,7 @@ def ask_cmd(question, k_chunks, threshold, model, temperature, save, session, ra
         session_name = save or session
         if session_name:
             _save_comparison_session(session_name, question, outcomes, session is not None)
-            console.print(f"\n[green]Comparison saved: {SESSION_DIR / f'{session_name}.md'}[/green]")
+            console.print(f"\n[green]Comparison saved: {session_dir() / f'{session_name}.md'}[/green]")
     else:
         try:
             result = ask_research_question(
@@ -1350,7 +1422,7 @@ def sessions_cmd(view):
                 return
             view = sessions[0]["name"]
 
-        path = SESSION_DIR / f"{view}.md"
+        path = session_dir() / f"{view}.md"
         if not path.exists():
             console.print(f"[red]Session '{view}' not found.[/red]")
             sys.exit(1)
@@ -1362,7 +1434,7 @@ def sessions_cmd(view):
         if not sessions:
             console.print("[yellow]No sessions found.[/yellow]")
             console.print(
-                f"[dim]Sessions directory: {SESSION_DIR}[/dim]"
+                f"[dim]Sessions directory: {session_dir()}[/dim]"
             )
             return
 
