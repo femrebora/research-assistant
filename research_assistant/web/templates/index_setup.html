@@ -16,6 +16,7 @@
     <p class="form-helper">This is where drafts, evidence notes, sessions, logs, and exported files are saved.</p>
 
     <form method="POST" action="/settings" style="margin-top:1rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <input type="hidden" name="next" value="/index-setup?step=2">
         <div>
             <label class="form-label" for="thesis-root">Thesis workspace folder
                 {{ help_tooltip("Your project workspace folder. Outputs, drafts, evidence notes, logs, and saved files are stored here.") }}
@@ -49,6 +50,7 @@
     <p class="form-helper">This folder contains your Zotero attachment files — usually many short random subfolders with PDFs.</p>
 
     <form method="POST" action="/settings" style="margin-top:1rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <input type="hidden" name="next" value="/index-setup?step=3">
         <div>
             <label class="form-label" for="zotero-storage">Zotero PDF storage folder
                 {{ help_tooltip("The folder that contains your PDFs. For Zotero, it is usually the Zotero storage folder. On Linux it is often ~/Zotero/storage, on macOS ~/Zotero/storage, on Windows C:\\Users\\your_username\\Zotero\\storage.") }}
@@ -71,6 +73,7 @@
             <span class="status-pill status-pill-muted">Not configured</span>
             {% endif %}
             <button type="button" class="btn btn-secondary btn-sm" onclick="autoDetectZotero()">Auto-detect Zotero path</button>
+            <span id="zotero-detect-status" class="form-helper" style="margin:0;"></span>
         </div>
         <div style="display:flex;gap:0.5rem;">
             <button type="submit" class="btn btn-primary">Save and continue</button>
@@ -81,15 +84,26 @@
 
 <script>
 function autoDetectZotero() {
-    var paths = [
-        '/home/' + (window.location.pathname.split('/')[2] || '') + '/Zotero/storage',
-        '/Users/' + (window.location.pathname.split('/')[2] || '') + '/Zotero/storage',
-        '/Users/' + (window.location.pathname.split('/')[2] || '') + '/Library/Application Support/Zotero/Profiles'
-    ];
     var field = document.getElementById('zotero-storage');
-    // Try the first likely path
-    field.value = paths[0];
-    field.focus();
+    var status = document.getElementById('zotero-detect-status');
+    if (status) status.textContent = 'Detecting…';
+    fetch('/index/detect-zotero')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (field && data.suggested) {
+                field.value = data.suggested;
+                field.focus();
+            }
+            if (status) {
+                var best = (data.candidates || []).find(function(c) { return c.exists; });
+                status.textContent = best
+                    ? ('Found ' + best.pdfs + ' PDF(s) at ' + best.path)
+                    : 'No existing Zotero storage found — enter the path manually.';
+            }
+        })
+        .catch(function() {
+            if (status) status.textContent = 'Detection failed — enter the path manually.';
+        });
 }
 </script>
 {% endif %}
@@ -101,6 +115,7 @@ function autoDetectZotero() {
     <p class="form-helper">These are used to read item metadata (titles, authors, collections) through the Zotero API.</p>
 
     <form method="POST" action="/settings" style="margin-top:1rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <input type="hidden" name="next" value="/index-setup?step=4">
         <div>
             <label class="form-label" for="zotero-user">Zotero user ID
                 {{ help_tooltip("Used to read Zotero item metadata through the Zotero API. This is not your email address. Find it at https://www.zotero.org/settings/keys") }}
@@ -370,9 +385,18 @@ async function pollIndexStatus() {
 }
 
 function clearIndex() {
-    if (confirm('Clear the entire index? This cannot be undone.')) {
-        alert('Index clearing is not yet implemented via the UI. Use the CLI.');
-    }
+    if (!confirm('Clear the entire index? This cannot be undone.')) return;
+    fetch('/index/clear', { method: 'POST' })
+        .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+        .then(function(res) {
+            if (!res.ok) {
+                alert(res.data.error || 'Failed to clear index');
+                return;
+            }
+            alert(res.data.existed ? 'Index cleared.' : 'No index was present.');
+            window.location.reload();
+        })
+        .catch(function() { alert('Failed to clear index'); });
 }
 
 function copyDiagnosticsFromState() {

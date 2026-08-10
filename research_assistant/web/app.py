@@ -23,12 +23,12 @@ from research_assistant.common import MODELS, ask_model
 from research_assistant.researcher import (
     DEFAULT_K,
     DEFAULT_THRESHOLD,
-    SESSION_DIR,
     _get_collection,
     _get_index_stats,
     ask_research_question,
     chroma_dir,
     compare_research_question,
+    session_dir,
 )
 from research_assistant.researcher import (
     list_sessions as list_research_sessions,
@@ -163,16 +163,28 @@ def _get_index_data():
         collection = _get_collection()
         stats = _get_index_stats(collection)
         meta = stats.get("index_meta") or {}
+        documents = int(stats.get("documents") or 0)
+        chunks = int(stats.get("chunks") or 0)
+        # An empty chroma folder (or only the synthetic meta doc) is not a usable index
+        exists = documents > 0 or chunks > 0
         return {
-            "exists": True,
-            "documents": stats["documents"],
-            "chunks": stats["chunks"],
+            "exists": exists,
+            "documents": documents,
+            "chunks": chunks,
             "embedding_model": meta.get("embedding_model", "unknown"),
             "chunk_size": meta.get("chunk_size", "?"),
             "last_indexed": meta.get("indexed_at", "never"),
         }
     except Exception:
-        return {"exists": True, "documents": 0, "chunks": 0, "error": True}
+        return {"exists": False, "documents": 0, "chunks": 0, "error": True}
+
+
+def _update_index_progress(current: int, total: int, status: str) -> None:
+    """Thread-safe progress callback for background indexing."""
+    with _index_lock:
+        _index_state["progress"] = current
+        _index_state["total"] = total
+        _index_state["status"] = status
 
 
 def _run_index_in_background(collection_name: str | None, limit: int | None, force: bool, use_local: bool = False, pdf_dir: str | None = None):
@@ -194,6 +206,7 @@ def _run_index_in_background(collection_name: str | None, limit: int | None, for
         zotero_user = os.environ.get("ZOTERO_USER_ID", "").strip()
         zotero_key = os.environ.get("ZOTERO_API_KEY", "").strip()
         can_use_zotero = bool(zotero_user and zotero_key)
+        embed_model = os.environ.get("EMBEDDING_MODEL", "").strip() or None
 
         if use_local or not can_use_zotero:
             if not can_use_zotero and not use_local:
@@ -202,7 +215,13 @@ def _run_index_in_background(collection_name: str | None, limit: int | None, for
             else:
                 with _index_lock:
                     _index_state["status"] = "Scanning local PDFs..."
-            stats = index_local_pdfs(pdf_dir=pdf_dir, force=force)
+            stats = index_local_pdfs(
+                pdf_dir=pdf_dir,
+                force=force,
+                limit=limit,
+                embedding_model=embed_model,
+                on_progress=_update_index_progress,
+            )
         else:
             with _index_lock:
                 _index_state["status"] = "Fetching from Zotero API..."
@@ -210,9 +229,15 @@ def _run_index_in_background(collection_name: str | None, limit: int | None, for
                 collection_name=collection_name,
                 limit=limit,
                 force=force,
+                embedding_model=embed_model,
+                on_progress=_update_index_progress,
             )
         with _index_lock:
-            _index_state["stats"] = stats
+            _index_state["stats"] = {
+                **stats,
+                "documents": stats.get("documents", stats.get("indexed", 0)),
+                "chunks": stats.get("total_chunks", 0),
+            }
             _index_state["status"] = "complete"
     except SystemExit:
         # index_* calls sys.exit(1) on fatal config errors — capture as error state
@@ -252,8 +277,9 @@ def _safe_session_path(name: str) -> Path | None:
     sanitized = name.lstrip("/").replace("\\", "/").rstrip("/")
     if not sanitized or sanitized.startswith("."):
         return None
-    path = (SESSION_DIR / sanitized).resolve()
-    if not str(path).startswith(str(SESSION_DIR.resolve())):
+    base = session_dir()
+    path = (base / sanitized).resolve()
+    if not str(path).startswith(str(base.resolve())):
         return None
     return path
 
@@ -322,8 +348,8 @@ def _render_markdown_to_html(text: str) -> str:
             content = re.sub(
                 r'\[@([a-zA-Z][a-zA-Z0-9_:.-]*)\]|(?<!\w)@([a-zA-Z][a-zA-Z0-9_:.-]*)',
                 lambda m: (
-                    '<code class="citekey">[@\\1]</code>' if m.group(1)
-                    else '<code class="citekey">@\\2</code>'
+                    f'<code class="citekey">[@{m.group(1)}]</code>' if m.group(1)
+                    else f'<code class="citekey">@{m.group(2)}</code>'
                 ),
                 content,
             )
@@ -459,6 +485,59 @@ def index_start():
 def index_status():
     """JSON endpoint for indexing progress."""
     return jsonify(_get_index_state())
+
+
+@app.route("/index/clear", methods=["POST"])
+def index_clear():
+    """Delete the local ChromaDB index directory."""
+    with _index_lock:
+        if _index_state.get("running"):
+            return jsonify({"error": "Cannot clear index while indexing is running"}), 409
+
+    target = chroma_dir()
+    if not target.exists():
+        return jsonify({"status": "cleared", "existed": False})
+
+    try:
+        import shutil
+
+        shutil.rmtree(target)
+        return jsonify({"status": "cleared", "existed": True})
+    except OSError as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/index/detect-zotero")
+def index_detect_zotero():
+    """Suggest existing Zotero storage paths on this machine."""
+    home = Path.home()
+    candidates = [
+        home / "Zotero" / "storage",
+        home / "Library" / "Application Support" / "Zotero" / "storage",
+        Path(f"/home/{home.name}/Zotero/storage"),
+        Path(f"/Users/{home.name}/Zotero/storage"),
+    ]
+    found = []
+    seen: set[str] = set()
+    for path in candidates:
+        try:
+            resolved = str(path.expanduser().resolve())
+        except OSError:
+            resolved = str(path.expanduser())
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        exists = path.expanduser().exists()
+        pdfs = 0
+        if exists:
+            try:
+                pdfs = len(list(path.expanduser().rglob("*.pdf")))
+            except OSError:
+                pdfs = 0
+        found.append({"path": resolved, "exists": exists, "pdfs": pdfs})
+
+    best = next((item for item in found if item["exists"]), None)
+    return jsonify({"candidates": found, "suggested": best["path"] if best else str(home / "Zotero" / "storage")})
 
 
 @app.route("/index")
@@ -910,15 +989,20 @@ def settings_page():
     flash_ok = None
     if request.method == "POST":
         try:
-            path = settings_store.save(request.form.to_dict())
+            form_data = request.form.to_dict()
+            path = settings_store.save(form_data)
+            # Optional redirect back to the setup wizard (or another page)
+            next_url = (form_data.get("next") or "").strip()
+            if next_url.startswith("/") and not next_url.startswith("//"):
+                return redirect(next_url)
             # Check if any path-like fields were changed (these need a restart)
             path_keys = {"THESIS_ROOT", "ZOTERO_STORAGE", "THESIS_DOCS"}
-            changed_paths = path_keys & set(request.form.to_dict().keys())
+            changed_paths = path_keys & set(form_data.keys())
             if changed_paths:
                 flash_ok = (
                     f"Saved to {path.name}. "
                     "API keys take effect immediately. "
-                    "Path changes need a restart — run <code>ra restart</code> "
+                    "Path changes need a restart — run `ra restart` "
                     "from your terminal, or open the status panel (Ctrl+\\) "
                     "and click Restart."
                 )
@@ -1280,6 +1364,7 @@ def index_setup():
         pdf_count=pdf_count, subfolder_count=subfolder_count,
         diagnostics=diagnostics,
         zotero_api_available=zotero_api_available,
+        models=MODELS,
     )
 
 

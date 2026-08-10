@@ -220,8 +220,8 @@ def main(question, models, rag, k, threshold, temperature, system, save, raw):
         try:
             from research_assistant.researcher import _save_comparison_session
             _save_comparison_session(save, question, outcomes)
-            from research_assistant.researcher import SESSION_DIR
-            console.print(f"\n[green]Comparison saved: {SESSION_DIR / f'{save}.md'}[/green]")
+            from research_assistant.researcher import session_dir
+            console.print(f"\n[green]Comparison saved: {session_dir() / f'{save}.md'}[/green]")
         except ImportError:
             console.print("[yellow]Cannot save session: researcher.py not importable[/yellow]")
 

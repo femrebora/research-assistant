@@ -11,7 +11,7 @@ broadest coverage. Use --source to switch.
 Usage:
     ./discover.py "NUMT contamination clinical mtDNA" --limit 15
     ./discover.py "..." --source semantic_scholar --year-from 2020
-    ./discover.py "..." --source elicit --question
+    ./discover.py "..." --source elicit
     ./discover.py "..." --export bibtex > new_papers.bib
     ./discover.py "..." --json
 """

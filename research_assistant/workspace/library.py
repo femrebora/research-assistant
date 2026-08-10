@@ -133,6 +133,34 @@ def zotero_storage_diagnostics() -> dict:
     }
 
 
+def _match_field(item: dict, query_lower: str, field: str) -> bool:
+    """Return True when *item* matches *query_lower* for the selected field."""
+    if field in ("", "all"):
+        haystacks = [
+            item.get("title", ""),
+            item.get("authors", ""),
+            item.get("citekey", ""),
+            item.get("abstract", ""),
+            " ".join(item.get("tags") or []),
+            item.get("pdf_path", ""),
+        ]
+        return any(query_lower in (h or "").lower() for h in haystacks)
+
+    if field == "title":
+        return query_lower in (item.get("title") or "").lower()
+    if field == "author":
+        return query_lower in (item.get("authors") or "").lower()
+    if field == "abstract":
+        return query_lower in (item.get("abstract") or "").lower()
+    if field == "citekey":
+        return query_lower in (item.get("citekey") or "").lower()
+    if field == "tag":
+        return any(query_lower in (t or "").lower() for t in (item.get("tags") or []))
+    if field == "collection":
+        return query_lower in (item.get("collection") or "").lower()
+    return True
+
+
 def search(query: str, field: str = "all") -> list[dict]:
     """Search Zotero library and local PDFs.
 
@@ -142,6 +170,8 @@ def search(query: str, field: str = "all") -> list[dict]:
     Returns a list of result dicts safe for template rendering.
     """
     results: list[dict] = []
+    field = (field or "all").strip().lower()
+    query_lower = (query or "").lower()
 
     # ── Zotero API search (if configured) ───────────────────────────────
     zotero_user = os.getenv("ZOTERO_USER_ID", "").strip()
@@ -150,7 +180,8 @@ def search(query: str, field: str = "all") -> list[dict]:
         try:
             from pyzotero import zotero as _zotero_mod
             zot = _zotero_mod.Zotero(zotero_user, "user", zotero_key)
-            items = zot.top(q=query, limit=30)
+            # Zotero's q searches titles/creators/etc.; refine client-side by field
+            items = zot.top(q=query, limit=50)
             for item in items:
                 data = item.get("data", {})
                 creators = data.get("creators", [])
@@ -160,35 +191,50 @@ def search(query: str, field: str = "all") -> list[dict]:
                 if len(creators) > 3:
                     author_str += " et al."
                 citekey = _extract_citekey_from_item(data)
-                results.append({
+                tags = [t.get("tag", "") for t in data.get("tags", []) if isinstance(t, dict)]
+                row = {
                     "title": data.get("title", "Untitled"),
                     "authors": author_str,
+                    "author": author_str,  # template-friendly alias
                     "year": (data.get("date", "") or "")[:4],
                     "citekey": citekey or data.get("key", ""),
                     "item_type": data.get("itemType", ""),
+                    "abstract": data.get("abstractNote", "") or "",
+                    "tags": tags,
+                    "collection": "",
                     "source": "Zotero API",
                     "pdf_path": "",
-                })
+                }
+                if _match_field(row, query_lower, field):
+                    results.append(row)
         except Exception:
             logger.exception("Zotero API search failed (user=%r)", zotero_user)
             # fall through to local search
 
+    # Local PDF filename search only applies to all/title/citekey-like fields
+    local_fields = {"", "all", "title", "citekey"}
+    if field not in local_fields and field not in {"author", "abstract", "tag", "collection"}:
+        field = "all"
+
     # ── Local PDF search in ZOTERO_STORAGE ──────────────────────────────
     zs = zotero_storage()
-    if zs and zs.exists() and query:
-        query_lower = query.lower()
+    if zs and zs.exists() and query and field in ("", "all", "title", "citekey"):
         try:
             for pdf_path in zs.rglob("*.pdf"):
-                if query_lower in pdf_path.name.lower():
+                if query_lower in pdf_path.name.lower() or query_lower in pdf_path.stem.lower():
                     rel = pdf_path.relative_to(zs).as_posix()
                     # Avoid duplicates with API results
                     if not any(r.get("pdf_path") == rel for r in results):
                         results.append({
                             "title": pdf_path.stem,
                             "authors": "",
+                            "author": "",
                             "year": "",
                             "citekey": "",
                             "item_type": "PDF",
+                            "abstract": "",
+                            "tags": [],
+                            "collection": "",
                             "source": "Zotero Storage",
                             "pdf_path": rel,
                         })
@@ -197,19 +243,22 @@ def search(query: str, field: str = "all") -> list[dict]:
 
     # ── Local PDF search in DOCS_DIR ────────────────────────────────────
     docs = docs_dir()
-    if docs.exists() and query:
-        query_lower = query.lower()
+    if docs.exists() and query and field in ("", "all", "title", "citekey"):
         try:
             for pdf_path in docs.rglob("*.pdf"):
-                if query_lower in pdf_path.name.lower():
+                if query_lower in pdf_path.name.lower() or query_lower in pdf_path.stem.lower():
                     rel = pdf_path.relative_to(docs).as_posix()
                     if not any(r.get("pdf_path") == rel for r in results):
                         results.append({
                             "title": pdf_path.stem,
                             "authors": "",
+                            "author": "",
                             "year": "",
                             "citekey": "",
                             "item_type": "PDF",
+                            "abstract": "",
+                            "tags": [],
+                            "collection": "",
                             "source": "Local",
                             "pdf_path": rel,
                         })
