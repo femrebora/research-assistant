@@ -23,9 +23,11 @@ def test_index_exists_false_for_empty_chroma(client, tmp_path, monkeypatch):
     """An empty chroma folder must not count as a usable index."""
     chroma = tmp_path / "chroma_db"
     chroma.mkdir()
-    with mock.patch("research_assistant.web.app.chroma_dir", return_value=chroma):
-        with mock.patch("research_assistant.web.app._get_collection", side_effect=RuntimeError("empty")):
-            resp = client.get("/stats")
+    with (
+        mock.patch("research_assistant.web.app.chroma_dir", return_value=chroma),
+        mock.patch("research_assistant.web.app._get_collection", side_effect=RuntimeError("empty")),
+    ):
+        resp = client.get("/stats")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["exists"] is False
@@ -107,9 +109,11 @@ def test_library_search_uses_authors_field(client):
         "year": "2024",
         "citekey": "doe2024",
     }]
-    with mock.patch("research_assistant.workspace.library.search", return_value=fake):
-        with mock.patch("research_assistant.workspace.library.list_pdfs", return_value=[]):
-            resp = client.get("/library-search?q=example&field=title")
+    with (
+        mock.patch("research_assistant.workspace.library.search", return_value=fake),
+        mock.patch("research_assistant.workspace.library.list_pdfs", return_value=[]),
+    ):
+        resp = client.get("/library-search?q=example&field=title")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Doe" in body
