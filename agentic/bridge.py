@@ -15,6 +15,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+
 def _thesis_root() -> Path:
     return Path(os.getenv("THESIS_ROOT", str(Path.home() / "thesis")))
 
